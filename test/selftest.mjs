@@ -236,6 +236,72 @@ check(rNone.status === 0, '未开 --fail-on 时退出码为 0');
 const rDry = runCli(['--dry-run']);
 check(rDry.status === 0 && rDry.stdout.includes('预演'), 'CLI --dry-run 只预演不运行');
 
+console.log('\n[12/12] v1.2：归因结论迁移对比（compare）');
+const { compareAttributions, compareSignatures, buildCompareMarkdown } = await import('../src/compare.mjs');
+const sameCmp = compareAttributions(attr2, attr2);
+check(sameCmp.compatible === true, '同签名归因可直接对比');
+check(
+  sameCmp.hunks.length === 3 && sameCmp.hunks.every((r) => r.status === 'same'),
+  '同签名对比时 3 个改动块结论全部「不变」'
+);
+let incompatibleRejected = false;
+try {
+  compareAttributions(attr, attr2);
+} catch (err) {
+  incompatibleRejected = err.code === 'PCAUSE_SIGNATURE';
+}
+check(incompatibleRejected, '采样数不同的两次实验默认拒绝对比（防误读）');
+const forced = compareAttributions(attr, attr2, { allowIncompatible: true });
+check(
+  forced.compatible === false && forced.mismatches.some((m) => m.field === 'samples'),
+  '--allow-incompatible 可强行对比并列出签名差异'
+);
+check(compareSignatures(attr, attr2).length > 0, 'compareSignatures 能量化签名差异');
+
+// 构造一份「结论发生迁移」的新归因：表格 决定性→无影响、语气 决定性→部分、内部说明消失、新增一块
+const attrB = structuredClone(attr2);
+attrB.id = 'attrB';
+attrB.hunks.find((h) => h.hunk.newLines.some((l) => l.includes('表格'))).verdict = 'inert';
+attrB.hunks.find((h) => h.hunk.newLines.some((l) => l.includes('表格'))).effect = 0;
+attrB.hunks.find((h) => h.hunk.newLines.some((l) => l.includes('温和'))).verdict = 'partial';
+attrB.hunks.find((h) => h.hunk.newLines.some((l) => l.includes('温和'))).effect = 0.3;
+attrB.hunks = attrB.hunks.filter((h) => !h.hunk.newLines.some((l) => l.includes('内部工具')));
+attrB.hunks.push({
+  hunk: { id: 'hX', type: 'added', oldLines: [], newLines: ['新增的一行要求'], summary: '新增的一行要求' },
+  verdict: 'partial',
+  effect: 0.25,
+  rawEffect: 0.25,
+});
+const migration = compareAttributions(attr2, attrB);
+const rowOf = (needle) => migration.hunks.find((r) => r.summary.includes(needle));
+check(
+  rowOf('表格')?.status === 'downgraded' && rowOf('表格')?.effectDelta === -1,
+  '决定性→无影响被标记为降级，且影响差值为 -100pt'
+);
+check(rowOf('温和')?.status === 'downgraded' && rowOf('温和')?.verdictChanged === true, '结论迁移被标记 verdictChanged');
+check(rowOf('内部工具')?.status === 'removed', 'B 中消失的改动块标记为「消失」');
+check(rowOf('新增')?.status === 'added', 'B 中新增的改动块标记为「新增」');
+const cmpMd = buildCompareMarkdown(migration);
+check(cmpMd.includes('归因对比') && cmpMd.includes('降级') && cmpMd.includes('消失'), '对比 Markdown 含标题与迁移状态');
+
+const runCompare = (args) =>
+  spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'compare', ...args], {
+    env: process.env,
+    encoding: 'utf8',
+  });
+const rCmp = runCompare([attr2.id, attr2.id]);
+check(rCmp.status === 0 && rCmp.stdout.includes('不变'), 'CLI compare 同签名退出码 0 且报告「不变」');
+const rCmpJson = runCompare([attr2.id, attr2.id, '--json']);
+let cmpJson = null;
+try {
+  cmpJson = JSON.parse(rCmpJson.stdout);
+} catch {
+  cmpJson = null;
+}
+check(!!cmpJson && cmpJson.ok === true && Array.isArray(cmpJson.hunks), 'CLI compare --json 输出机器可读结果');
+const rCmpBad = runCompare([attr.id, attr2.id]);
+check(rCmpBad.status === 1 && rCmpBad.stderr.includes('签名不一致'), 'CLI compare 签名不一致时退出码 1 并说明原因');
+
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
 if (failures.length) {

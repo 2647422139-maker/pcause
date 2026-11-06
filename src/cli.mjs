@@ -11,6 +11,7 @@ import {
 import { diffHunks, describeHunk } from './diff.mjs';
 import { attribute, VERDICT_LABEL } from './attribute.mjs';
 import { buildMarkdown, buildHtml } from './report.mjs';
+import { compareAttributions, buildCompareMarkdown } from './compare.mjs';
 import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,8 @@ const HELP = `pcause —— 提示词因果归因器
   pcause attribute --old <id> --new <id> --probes <file> [选项]
                                                  跑一次归因实验（核心命令）
   pcause report <attrId> [--md out.md] [--html out.html]
+  pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]
+                                                 对比两次归因的结论迁移（签名不一致时拒绝，避免误读）
   pcause schema [--out file]                     导出机器可读结果的 JSON Schema
   pcause selftest                                离线自测
 
@@ -46,6 +49,11 @@ attribute 选项：
   --fail-on decisive|partial        CI 门禁：命中则退出码 2（采样不足的块不参与门禁）
   --json                            输出符合 schema/attribution.schema.json 的完整 JSON
   --json-out <file>                 同时把这份 JSON 写到文件
+
+compare 选项：
+  --allow-incompatible  两次实验签名不一致时仍强行对比（默认拒绝，因为差异可能来自实验条件）
+  --json                输出机器可读的对比结果
+  --md <file>           把对比结果写成 Markdown
 
 退出码：0 成功且未命中门禁；1 运行错误；2 命中 --fail-on 门禁（成功跑完，业务阻断）。
 
@@ -314,6 +322,54 @@ function cmdReport(flags, pos) {
   return 0;
 }
 
+function cmdCompare(flags, pos) {
+  requireInit();
+  const [aId, bId] = pos;
+  if (!aId || !bId) throw new Error('用法：pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]');
+  const a = getAttribution(aId);
+  const b = getAttribution(bId);
+  let result;
+  try {
+    result = compareAttributions(a, b, { allowIncompatible: flags['allow-incompatible'] === true });
+  } catch (err) {
+    if (err.code === 'PCAUSE_SIGNATURE') {
+      console.error('✖ ' + err.message);
+      return 1;
+    }
+    throw err;
+  }
+  const md = buildCompareMarkdown(result);
+  if (typeof flags.md === 'string') {
+    const out = path.resolve(flags.md);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, md, 'utf8');
+  }
+  if (flags.json) {
+    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+    return 0;
+  }
+  tick(`对比：${result.aId} → ${result.bId}`);
+  tick(result.compatible ? '✔ 实验签名一致，结论可直接对比' : '⚠ 实验签名不一致，结论仅作参考');
+  if (result.mismatches.length) {
+    for (const m of result.mismatches) tick(`  ! ${m.message}`);
+  }
+  tick('');
+  for (const r of result.hunks) {
+    const va = r.before ? VERDICT_LABEL[r.before.verdict] ?? r.before.verdict : '—';
+    const vb = r.after ? VERDICT_LABEL[r.after.verdict] ?? r.after.verdict : '—';
+    const ea = r.before?.effect == null ? '  —' : String(Math.round(r.before.effect * 100)).padStart(3) + '%';
+    const eb = r.after?.effect == null ? '  —' : String(Math.round(r.after.effect * 100)).padStart(3) + '%';
+    const d = r.effectDelta == null ? '' : ` (${r.effectDelta >= 0 ? '+' : ''}${Math.round(r.effectDelta * 100)}pt)`;
+    tick(`  ${r.statusLabel.padEnd(3)} ${String(r.hunk ?? '—').padEnd(4)} ${va} → ${vb}  ${ea} → ${eb}${d}  ${r.summary}`);
+  }
+  const s = result.summary;
+  tick('');
+  tick(`合计：不变 ${s.same}，升级 ${s.upgraded}，降级 ${s.downgraded}，新增 ${s.added}，消失 ${s.removed}`);
+  if (result.note) tick(`⚠ ${result.note}`);
+  if (typeof flags.md === 'string') tick(`Markdown：${path.resolve(flags.md)}`);
+  return 0;
+}
+
 function cmdSchema(flags) {
   const file = path.join(PKG_ROOT, 'schema', 'attribution.schema.json');
   if (!fs.existsSync(file)) throw new Error('schema 文件缺失：' + file);
@@ -356,12 +412,14 @@ async function main() {
       return cmdAttribute(flags);
     case 'report':
       return cmdReport(flags, pos);
+    case 'compare':
+      return cmdCompare(flags, pos);
     case 'schema':
       return cmdSchema(flags);
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.2.0');
+      tick('pcause 0.3.0');
       return 0;
     case 'help':
     case '--help':

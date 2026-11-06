@@ -3,7 +3,16 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-56%2F56%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-69%2F69%20passing-brightgreen)
+
+## v1.2 更新摘要
+
+新增 **`pcause compare <attrA> <attrB>`：归因结论迁移对比**。同一处提示词改动，两轮实验的结论从「无影响」变成「决定性」了吗？交给两轮实验、各自带噪声校正的结论去回答，而不是靠回忆。
+
+- **签名一致性校验（默认拒绝）**：对比前校验探针集合、每探针采样次数、生成器（名称/模型/温度）、判定器与复核器、归因对象类型；任一不同（如两次实验换了模型或采样数）就报错退出，避免把「实验条件差异」误读成「因果结论变化」。确需对比时用 `--allow-incompatible`，输出会明确标注结论仅作参考。
+- **按内容对齐改动块**：h1..hn 是按顺序编号的，提示词插入一行就会整体错位；compare 用「类型 + 旧行 + 新行」内容做主键对齐，只比较同一个改动块的前后结论。
+- **迁移状态一目了然**：不变 / 升级 / 降级 / 新增 / 消失，附影响强度差值（pt）、`verdictChanged` 标记、Markdown 与 `--json` 两种输出，适合放进版本发布说明或 CI 的回归检查。
+- 演示产物：[`docs/compare-demo.md`](docs/compare-demo.md)、[`docs/compare-demo.json`](docs/compare-demo.json)（两次真实实验：签名一致，3 个改动块结论全部不变）。
 
 ## v1.1 更新摘要
 
@@ -102,6 +111,7 @@ CI 里最需要的是「可判定的结果」，而不是好看的报告：
 - **稳定 JSON**：`--json` 输出完整结果，`--json-out result.json` 同时落盘；结构见 [`schema/attribution.schema.json`](schema/attribution.schema.json)，也可用 `pcause schema --out attribution.schema.json` 导出。核心字段冻结，插件/自定义数据只能进 `extensions`，避免上层脚本被插件字段膨胀拖垮。
 - **预算不足的语义**：`--max-calls` 耗尽后，已完成的块照常给结论，未测完的块状态为 `unmeasured`、`samplingInsufficient: true`，报告醒目提示「采样不足 ≠ 无影响」；退出码仍是 0。
 - **门禁**：`--fail-on decisive` 在任意「决定性」块出现时退出码 2；`--fail-on partial` 连「部分影响」也算命中。`samplingInsufficient` 的块不参与门禁，避免样本不够时误阻断流水线。
+- **回归对比**：`pcause compare <旧归因> <新归因>` 在实验签名一致时列出结论迁移（不变 / 升级 / 降级 / 新增 / 消失）与影响强度差值；签名不一致会拒绝（退出码 1）并说明差异，适合放进「提示词连续迭代」的回归检查。
 
 ```bash
 # 先看要花多少钱（不联网、不读 Key）
@@ -127,6 +137,8 @@ pcause diff <old> <new>                       查看两个版本的改动块（h
 pcause run <id> --probes <file>               用某个版本跑探针
 pcause attribute --old <id> --new <id> --probes <file> [选项]   核心：跑归因实验
 pcause report <attrId> [--md out.md] [--html out.html]          重新导出报告
+pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]
+                                              对比两次归因的结论迁移（签名一致才允许，默认拒绝）
 pcause schema [--out file]                    导出机器可读结果 JSON Schema
 pcause selftest                               离线自测
 ```
@@ -148,7 +160,15 @@ pcause selftest                               离线自测
 | `--json` | 输出符合 schema 的完整 JSON（含元信息、逐块结论、汇总） |
 | `--json-out <file>` | 同时把这份 JSON 写到文件 |
 
-探针文件支持 `.jsonl` / `.json` 数组 / 纯文本（一行一条输入）。退出码：`0` 成功跑完（可能含采样不足）；`1` 运行错误；`2` 命中 `--fail-on` 门禁。
+`compare` 选项：
+
+| 选项 | 说明 |
+| --- | --- |
+| `--allow-incompatible` | 两次实验签名不一致时仍强行对比（默认拒绝；输出会标注结论仅作参考） |
+| `--json` | 输出机器可读的对比结果（含 `compatible`、`mismatches`、逐块迁移） |
+| `--md <file>` | 把对比结果写成 Markdown |
+
+探针文件支持 `.jsonl` / `.json` 数组 / 纯文本（一行一条输入）。退出码：`0` 成功跑完（可能含采样不足）；`1` 运行错误或 `compare` 的签名不一致；`2` 命中 `--fail-on` 门禁。
 
 ## 6. 实测发现：为什么必须做噪声校正
 
@@ -173,6 +193,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 
 1. 第一轮豆包从泛用性 / 实用性 / 可扩展性三个维度给了一份优先级清单：泛化应先按「消融对象类型」隔离判定语义（而不是把 RAG 模板、工具 schema、模型参数一锅端）；落地必须先补预算分层、失败门禁、稳定机器输出；扩展应先定义 Provider / Judge / Reporter 接口。它同时提醒：pcause 最容易误用的不是模型不稳定，而是用户把「探针上的关联证据」当成严格因果。
 2. 第二轮把清单收敛到「一次迭代能完成、测试、发版」的范围：保留 `--kind` + 固定免责、`--dry-run` + 预算语义、CI 门禁、稳定 JSON schema 四项（全部是观测层 / 包装层，不动判定与采样内核）；采样提前停止、插件注册表、两次归因结论对比按规定进入 v1.2 路线。
+3. v1.2 的第一项按 roadmap 落地为 `compare`，其设计又回到豆包确认：签名必须包含探针集、采样数、生成器与判定器；对比时最容易翻车的是「只比 verdict、忽略 hunk 对齐错位」，所以实现用内容做主键、只比同一改动块的前后结论。
 
 ## 8. 目录结构
 
@@ -185,12 +206,13 @@ pcause/
 │   ├── providers.mjs  模型通道：mock / deepseek / doubao
 │   ├── judge.mjs      判定器：heuristic / deepseek / doubao
 │   ├── attribute.mjs  归因引擎（采样、噪声地板、校正、第二意见、预算护栏、dry-run 预估）
+│   ├── compare.mjs    归因结论迁移对比（签名校验、按内容对齐 hunk、迁移报告）
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  56 项离线自测
+├── test/selftest.mjs  69 项离线自测
 ├── examples/          分类器演示的提示词与探针
-├── docs/              演示报告（HTML / Markdown）与演示 JSON
+├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json
 ```
 
@@ -204,6 +226,7 @@ pcause/
 - **豆包通道需要桌面版保持登录并带调试端口运行**（`start-doubao-debug.cmd`），每次调用约 6–13 秒，依赖界面 DOM，可能随版本变化失效；子进程有硬超时保护。
 - **成本**：调用数 ≈ 探针数 × 采样数 × (1 + hunk 数) + 判定批次数，**判定器的模型调用也计入 `--max-calls` 预算**。复杂提示词请先用 `--dry-run` 预估、再用 `--limit` 缩小探针集。
 - **JSON schema 治理**：核心字段（`meta / hunks / summary`）冻结、按语义化版本维护；新能力优先放进 `extensions`，破坏性变更需升主版本号并同步更新 CI 逻辑。
+- **`compare` 只比结论，不重跑实验**：它对比的是两轮归因各自的结论，不会替你重新采样；两次实验间隔期间换了模型服务商、探针或采样数都会被签名校验拦下（可 `--allow-incompatible` 强看，但差异可能来自实验条件）。另外，若「同一句改动」被改写过措辞（旧行/新行内容变了），会被当成「消失 + 新增」，因为对齐主键是内容。
 
 ## 10. 许可
 

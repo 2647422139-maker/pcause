@@ -1,0 +1,95 @@
+{
+  "ok": true,
+  "aId": "attr-20261106170034-d13c",
+  "bId": "attr-20261106173129-ba24",
+  "compatible": true,
+  "mismatches": [],
+  "summary": {
+    "same": 3,
+    "upgraded": 0,
+    "downgraded": 0,
+    "added": 0,
+    "removed": 0
+  },
+  "hunks": [
+    {
+      "key": "added\u0000\u0000如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。",
+      "status": "same",
+      "statusLabel": "不变",
+      "hunk": "h1",
+      "summary": "+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。",
+      "before": {
+        "id": "h1",
+        "summary": "+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。",
+        "verdict": "partial",
+        "effect": 0.3333333333333333,
+        "rawEffect": 0.3333333333333333,
+        "samplingInsufficient": false
+      },
+      "after": {
+        "id": "h1",
+        "summary": "+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。",
+        "verdict": "partial",
+        "effect": 0.3333333333333333,
+        "rawEffect": 0.3333333333333333,
+        "samplingInsufficient": false
+      },
+      "effectDelta": 0,
+      "verdictChanged": false,
+      "note": null
+    },
+    {
+      "key": "added\u0000\u0000最终只输出一个 JSON 对象：{\"category\": \"<类别名>\"}，不要输出其他内容。",
+      "status": "same",
+      "statusLabel": "不变",
+      "hunk": "h2",
+      "summary": "+ 最终只输出一个 JSON 对象：{\"category\": \"<类别名>\"}，不要输出其他内容。",
+      "before": {
+        "id": "h2",
+        "summary": "+ 最终只输出一个 JSON 对象：{\"category\": \"<类别名>\"}，不要输出其他内容。",
+        "verdict": "decisive",
+        "effect": 1,
+        "rawEffect": 1,
+        "samplingInsufficient": false
+      },
+      "after": {
+        "id": "h2",
+        "summary": "+ 最终只输出一个 JSON 对象：{\"category\": \"<类别名>\"}，不要输出其他内容。",
+        "verdict": "decisive",
+        "effect": 1,
+        "rawEffect": 1,
+        "samplingInsufficient": false
+      },
+      "effectDelta": 0,
+      "verdictChanged": false,
+      "note": null
+    },
+    {
+      "key": "added\u0000\u0000注意：本分类器是内部工具，输出会进入数据看板。",
+      "status": "same",
+      "statusLabel": "不变",
+      "hunk": "h3",
+      "summary": "+ 注意：本分类器是内部工具，输出会进入数据看板。",
+      "before": {
+        "id": "h3",
+        "summary": "+ 注意：本分类器是内部工具，输出会进入数据看板。",
+        "verdict": "inert",
+        "effect": 0,
+        "rawEffect": 0,
+        "samplingInsufficient": false
+      },
+      "after": {
+        "id": "h3",
+        "summary": "+ 注意：本分类器是内部工具，输出会进入数据看板。",
+        "verdict": "inert",
+        "effect": 0,
+        "rawEffect": 0,
+        "samplingInsufficient": false
+      },
+      "effectDelta": 0,
+      "verdictChanged": false,
+      "note": null
+    }
+  ],
+  "note": null
+}
