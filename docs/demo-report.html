@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>提示词归因报告 · attr-20261106185518-d516</title>
+<title>提示词归因报告 · attr-20261106192655-df23</title>
 <style>
   :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --fg:#e6e8ee; --muted:#98a0b3;
     --line:#2a2f3a; --accent:#7aa2ff; --good:#3ecf8e; --warn:#f0b429; --bad:#ff6b6b; }
@@ -56,7 +56,7 @@
 <body>
 <main>
   <h1>提示词归因报告</h1>
-  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106185518-d516 · 2026-11-06 18:55:18</div>
+  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106192655-df23 · 2026-11-06 19:26:55</div>
   <section>
     <h2>阅读须知（固定三条）</h2>
     <ul class="caveats"><li>假设：本分析假设各改动块（hunk）近似独立，不检测改动与改动之间的交互效应。</li><li>约束：结论高度依赖探针集合、判定器与采样随机噪声；判定器本身也可能出错。</li><li>泛化：归因对象类型不同（提示词 / 系统提示 / Agent 指令），上述假设的可信度不同。</li></ul>
@@ -66,10 +66,11 @@
     <div class="card"><div class="k">归因对象</div><div class="v">用户提示词</div><div class="note">假设可信度：中等</div></div>
     <div class="card"><div class="k">生成模型</div><div class="v">deepseek / deepseek-flash</div></div>
     <div class="card"><div class="k">判定器</div><div class="v">deepseek + doubao</div></div>
+    <div class="card"><div class="k">判定维度（用户提示词）</div><div class="v">通用实质行为差异（结构 / 指令遵守 / 核心主张 / 语气范式 / 信息量）</div></div>
     <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">3 / 3 / 3</div><div class="note">自适应：先测 2 次</div></div>
     <div class="card"><div class="k">采样策略</div><div class="v">自适应（先测 2 次）</div><div class="note">仅在结论含糊或噪声偏高时补到 3 次</div></div>
     <div class="card"><div class="k">噪声地板</div><div class="v">0%</div></div>
-    <div class="card"><div class="k">调用 / 耗时</div><div class="v">36 次 · 0.1s</div></div>
+    <div class="card"><div class="k">调用 / 耗时</div><div class="v">36 次 · 0.0s</div></div>
   </div>
   
   <section>

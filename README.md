@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-132%2F132%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-140%2F140%20passing-brightgreen)
+
+## v1.8 更新摘要
+
+工程化 / 可发布轮：让「安装、发版、追溯」三件事规范化（不改任何判定与采样逻辑）。
+
+- **发布元数据补齐**：`repository` / `bugs` / `homepage` / `keywords` / `engines`（Node ≥ 20）。
+- **`files` 白名单**：发布包只含 `src/`、`schema/`、`examples/`、`docs/`、README、CHANGELOG、LICENSE；本地 `.pcause/` 工作区、测试脚本与 `pcause.config.json` 不会被打进包。
+- **CHANGELOG.md**：按 Keep a Changelog 轻量格式记录 0.1.0 → 0.8.0 的全部变更；发版时同步版本号。
+- **演示产物刷新**：`docs/demo-report.{md,html}` 与 `docs/demo-attribution.json` 用当前模板重新导出（含「判定维度」「采样策略」「采样披露」行）。
+- 自测 **141/141**（新增 9 项：engines、files 白名单、元数据、CHANGELOG 覆盖与版本同步、README 入口、LICENSE）。
 
 ## v1.7 维护轮更新摘要
 
@@ -13,7 +23,7 @@
 - **kind 的大白话对照**：README 明确 `--kind` 描述的是提示词在系统中的**位置**（任务提示词 / 系统提示词 / Agent 指令），不是给输出打业务标签；选错会让判定维度错配。
 - **compare 的预期锁定**：README 与 `--help` 都写明它不做「两次回答谁更好」的打分对比，只回答「同一个改动块的影响这次是否还成立」。
 - **零 Key 上手路径**：快速开始增加 `--provider mock` 的离线跑通命令，装完先看报告长什么样，再决定是否接真模型。
-- 自测 **132/132**（新增 6 项：预估行、预算单位提示、help 的 version/run/compare 说明）。
+- 自测当时为 **132/132**（v1.8 起为 141/141）。
 
 ## v1.6 更新摘要
 
@@ -147,8 +157,10 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 132/132 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 141/141 项离线自测，不联网、不花钱
 ```
+
+版本变更历史见 [CHANGELOG.md](CHANGELOG.md)。发布包只包含 `src/`、`schema/`、`examples/`、`docs/` 与文档（见 `package.json` 的 `files` 白名单），本地 `.pcause/` 工作区不会被一起发布。
 
 生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经本机 `doubao-bridge` 技能，无需任何 API Key）。
 
@@ -294,6 +306,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 5. v1.4 的插件接口同样先与豆包对表：接口保持「Provider 只有 `generate`、Judge 只有 `judgeBatch`、`ctx` 只传只读配置」；它指出的头号风险是插件自行发起请求或递归调内部逻辑从而绕过核心的调用计数与缓存——因此 pcause 把预算与缓存收在核心包装层（一次 generate / 一个判定批次记 1 次调用），并要求插件名不得覆盖内置通道。本地插件的安全边界也写进了限制（可执行代码，只加载显式声明的本地文件）。
 6. v1.6 的判定维度适配由豆包先给结构：它主张 system 与 agent 是两种责任面——system 只看「守不守规则」、agent 只看「活有没有干对」，其余维度（话术润色、角色人设等）都该裁掉；并给了三类高频误判（规则内的合理变通被当越界、异常分支被硬卡格式、需要多步探索的任务被判失败）。实现采纳它的「阶段 1」建议：只做提示词分流、对外 schema 零改动、`--kind prompt` 逐字不变；结构化分维度打分与「system 违规一票否决 agent」的分层流水线留作后续演进。
 7. v1.7 维护轮请豆包扮演「第一次使用者」做可用性挑刺：它指出最致命的不是功能缺口，而是三个预期错位——把 `--kind` 当成输出业务标签、把预算当成金额、把 `compare` 当成打分对比。本轮据此只改提示与文档（运行前打印消耗预估、预算单位显式标注、kind 大白话对照、compare 预期锁定、增加零 Key 离线上手路径），不动判定与采样内核。
+8. v1.8 的发布元数据与 CHANGELOG 同样先问豆包：它把「package.json 发布元数据 + npm pack 白名单」列为最高性价比，其次是标准化 CHANGELOG 与版本同步校验，第三是结构化可诊断错误码（本轮未做——pcause 已有 `PCAUSE_BUDGET` / `PCAUSE_SIGNATURE` / `PCAUSE_PLUGIN` 等错误码，统一错误出口与快照测试留作后续）。
 
 ## 8. 目录结构
 
@@ -313,9 +326,10 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  132 项离线自测
+├── test/selftest.mjs  141 项离线自测
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
+├── CHANGELOG.md       版本变更历史（Keep a Changelog 轻量格式）
 └── package.json
 ```
 

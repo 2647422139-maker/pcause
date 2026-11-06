@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.7.1', '版本号升到 0.7.1');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.8.0', '版本号升到 0.8.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.7.1'), 'CLI 版本号更新为 0.7.1（版本号读 package.json，不再硬编码）');
+check(String(cliVersion.stdout).includes('0.8.0'), 'CLI 版本号与 package.json 同步（0.8.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -588,6 +588,27 @@ const rHelp = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs')
 check(String(rHelp.stdout).includes('pcause version'), 'help 列出 version 命令');
 check(String(rHelp.stdout).includes('run 选项'), 'help 说明 run 命令的可用选项');
 check(String(rHelp.stdout).includes('不是「两次回答谁更好」的打分对比'), 'help 里 compare 的预期被显式锁定');
+
+console.log('\n[18/18] v1.8：发布元数据与 CHANGELOG 同步');
+const pkgMeta = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
+check(pkgMeta.engines && pkgMeta.engines.node === '>=20', 'package.json 声明 engines: node >=20');
+const filesList = Array.isArray(pkgMeta.files) ? pkgMeta.files : [];
+check(
+  ['src/', 'schema/', 'examples/', 'docs/', 'README.md', 'CHANGELOG.md', 'LICENSE'].every((f) => filesList.includes(f)),
+  '发布 files 白名单覆盖源码/示例/文档/许可证'
+);
+check(!filesList.some((f) => f.includes('.pcause') || f.includes('pcause.config.json') || f.startsWith('test')), '发布包排除 .pcause、本地配置与测试脚本');
+check(Boolean(pkgMeta.repository && pkgMeta.repository.url && pkgMeta.bugs && pkgMeta.bugs.url && pkgMeta.homepage), '补齐 repository / bugs / homepage 元数据');
+check(Array.isArray(pkgMeta.keywords) && pkgMeta.keywords.includes('causal-inference'), 'keywords 含 causal-inference');
+
+const changelogPath = path.join(PKG_ROOT, 'CHANGELOG.md');
+const changelogText = fs.existsSync(changelogPath) ? fs.readFileSync(changelogPath, 'utf8') : '';
+check(changelogText.length > 0 && changelogText.includes('## [0.1.0]'), 'CHANGELOG 存在且覆盖初始版本');
+const firstVersion = (changelogText.match(/## \[(\d+\.\d+\.\d+)\]/) || [])[1];
+check(firstVersion === pkgMeta.version, `CHANGELOG 最新条目与 package.json 版本一致（${pkgMeta.version}）`);
+const readmeText = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readmeText.includes('CHANGELOG.md'), 'README 提供版本历史入口');
+check(fs.existsSync(path.join(PKG_ROOT, 'LICENSE')), 'LICENSE 文件存在');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

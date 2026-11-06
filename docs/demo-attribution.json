@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
-  "id": "attr-20261106185518-d516",
-  "createdAt": "2026-11-06T18:55:18.608Z",
+  "id": "attr-20261106192655-df23",
+  "createdAt": "2026-11-06T19:26:55.727Z",
   "kind": "prompt",
   "kindLabel": "用户提示词",
   "confidence": {
@@ -37,10 +37,10 @@
       "name": "doubao",
       "model": "doubao-desktop"
     },
-    "maxCalls": 200,
+    "maxCalls": 400,
     "calls": 36,
     "cacheHits": 36,
-    "elapsedMs": 59,
+    "elapsedMs": 43,
     "dryRun": false
   },
   "noise": {
