@@ -44,5 +44,5 @@ jobs:
       - name: Release preflight (static checks)
         run: node scripts/preflight.mjs --no-tests
 
-      - name: Packaging sanity (npm pack --dry-run)
-        run: npm pack --dry-run
+      - name: Packaging + install rehearsal (npm pack -> tmp install -> run bin)
+        run: npm run pack-check -- --quiet

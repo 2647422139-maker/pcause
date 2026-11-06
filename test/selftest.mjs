@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.11.0', '版本号升到 0.11.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.12.0', '版本号升到 0.12.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.11.0'), 'CLI 版本号与 package.json 同步（0.11.0）');
+check(String(cliVersion.stdout).includes('0.12.0'), 'CLI 版本号与 package.json 同步（0.12.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -672,11 +672,29 @@ check(ciText.includes('permissions:') && ciText.includes('contents: read'), '最
 check(ciText.includes('group: ${{ github.workflow }}-${{ github.ref }}') && ciText.includes('cancel-in-progress: ${{ github.event_name =='), '并发取消策略：PR 取消旧运行、main 保留');
 check(/run: npm test/.test(ciText), 'CI 跑离线自测');
 check(ciText.includes('node scripts/preflight.mjs --no-tests'), 'CI 跑发布前静态检查');
-check(ciText.includes('npm pack --dry-run'), 'CI 验证发布包白名单');
+check(ciText.includes('npm run pack-check -- --quiet'), 'CI 做打包 + 独立安装演练');
 check(!ciText.includes('secrets.'), 'CI 不引用任何密钥');
 check(!ciText.includes('\t'), 'workflow 不含 tab 缩进（YAML 合法前提）');
 const readmeCi = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
 check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && readmeCi.includes('v1.11 更新摘要'), 'README 展示 CI badge 并记录 v1.11');
+
+console.log('\n[22/22] v1.12：npm 发布演练（scripts/pack-check.mjs）');
+const pc = await import('../scripts/pack-check.mjs');
+check(pc.normalizeTarballPaths([{ path: 'package/src/cli.mjs' }, { path: 'package/README.md' }]).join(',') === 'README.md,src/cli.mjs', 'tarball 路径归一：去掉 package/ 前缀并排序');
+check(pc.REQUIRED_IN_TARBALL.includes('scripts/preflight.mjs') && pc.REQUIRED_IN_TARBALL.includes('scripts/pack-check.mjs'), '必含清单守住「package.json 脚本引用的文件」');
+check(pc.missingFromTarball(['package.json']).includes('src/cli.mjs'), '能识别发布包缺文件');
+check(
+  pc.forbiddenInTarball(['.pcause/automation/state.json', 'test/selftest.mjs', '.github/workflows/ci.yml', 'node_modules/x']).length === 4,
+  '能识别工作区 / 测试 / CI / node_modules 混入发布包'
+);
+check(pc.hasShebang('#!/usr/bin/env node\nconsole.log(1)\n') && pc.hasShebang('#!/usr/bin/env node\r\n'), 'shebang 校验兼容 LF 与 CRLF');
+check(!pc.hasShebang('console.log(1)\n'), '无 shebang 会被识别');
+const pcResult = pc.packCheck({ log: () => {} });
+check(pcResult.ok && pcResult.checks.length === 10, 'packCheck 本仓库 10/10 通过（pack → 独立目录 install → 跑 bin）');
+check(pcResult.checks.some((c) => c.name.includes('独立临时目录安装')), '演练确实做了「独立目录 npm install tgz」');
+check(pcResult.checks.some((c) => c.name.includes('shebang')), '演练校验安装包 bin 的 shebang');
+check(pcResult.checks.some((c) => c.name.includes('pcause version')), '演练通过 bin shim 真实执行 version');
+check(typeof pcResult.tarball === 'string' && pcResult.tarball.endsWith('.tgz'), 'tarball 名称可追溯（演练产物真实）');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

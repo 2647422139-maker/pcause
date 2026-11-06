@@ -2,6 +2,19 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.12.0] - 2026-11-07
+
+### Added
+
+- 发布演练脚本 `scripts/pack-check.mjs`（`npm run pack-check`）：真的 `npm pack` → 在**独立的空临时项目**里 `npm install ./pcause-x.y.z.tgz` → 通过 `node_modules/.bin/pcause` shim 跑 `version` / `help`，并校验发布包文件清单、排除项、shebang 与版本一致（10 项检查）。
+- `package.json` 的 `files` 白名单补上 `scripts/`：此前 `npm run preflight` 引用了未被打进发布包的脚本（演练发现并修复）。
+- README「4.4 npm 发布演练」与 v1.12 摘要；自测新增发布演练检查（185 项）。
+
+### Changed
+
+- 版本升到 0.12.0。
+- 已确认 `pcause` 包名在 npm registry 上未被占用（`npm view pcause` 返回 404）。
+
 ## [0.11.0] - 2026-11-07
 
 ### Added

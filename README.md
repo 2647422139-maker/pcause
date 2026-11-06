@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-174%2F174%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-185%2F185%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.12 更新摘要
+
+发布演练：不再只相信「本地 `npm test` 绿了」，而是**真的打一个包、装进一个空的临时项目、用用户的方式运行它**。
+
+- 新增 `scripts/pack-check.mjs`（`npm run pack-check`）：`npm pack` → 独立空目录 `npm install ./pcause-x.y.z.tgz` → 通过 `node_modules/.bin/pcause` 这个 shim 跑 `version` / `help`，再直接 `node` 跑包内 CLI，两条路径都要通。
+- **真的抓到了 bug**：`package.json` 的 `files` 白名单漏了 `scripts/`，而 `package.json` 的 `preflight` 脚本又引用了 `scripts/preflight.mjs` —— 本地没事，装完 `npm run preflight` 会找不到文件。演练当场失败，修复后 10/10 通过。
+- 顺带校验：发布包必须含 `src/cli.mjs` / `schema/` / `examples/` / `docs/` / `CHANGELOG.md` / `LICENSE` / `scripts/`；绝不能含 `.pcause/`、`test/`、`.github/`、`node_modules/`；安装包里的 bin 必须有合法 shebang（`.gitattributes` 已强制 `.mjs` 用 LF，避免 Windows 下 CRLF 破坏 `#!`）。
+- 名字可用性：`npm view pcause` 返回 404，说明 `pcause` 这个包名还没有被占用（真要发布仍需 `npm login` + `npm publish`，本仓库未执行发布）。
+- 自测 **185/185**（新增 11 项：路径归一、必含清单、缺文件/混入检测、shebang 兼容 LF/CRLF、演练 10/10、独立目录安装、shim 与直连云）。
 
 ## v1.11 更新摘要
 
@@ -15,7 +25,7 @@
 - **零依赖不做缓存**：没有 lockfile / node_modules，加缓存只有开销没有收益。
 - 踩过的坑（豆包建议采纳）：`node --version` 这类步骤是日志噪音，删掉；Node 24 全平台铺开性价比低；`npm pack --dry-run` 不校验 `exports`，本仓库只暴露 `bin` 所以足够。
 - 状态徽章：README 顶部新增 CI badge，点开即最近一次矩阵运行。
-- 自测 **174/174**（新增 12 项：workflow 存在、触发规则、矩阵版本与平台、最小权限、并发策略、三步检查、无密钥引用、无 tab 缩进、README CI badge 与 v1.11 记录）。
+- 自测 **174/174**（新增 12 项：workflow 存在、触发规则、矩阵版本与平台、最小权限、并发策略、三步检查、无密钥引用、无 tab 缩进、README CI badge 与 v1.11 记录；v1.12 起为 185/185）。
 
 ## v1.10 更新摘要
 
@@ -194,7 +204,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 174/174 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 185/185 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -316,15 +326,36 @@ echo $?                                            # 0 全部通过；1 有检�
 | 主干兼容 | Ubuntu / Windows | 20、22 |
 | 前瞻验证 | Ubuntu | 24 |
 
-每个组合依次执行：`npm test`（离线自测）→ `node scripts/preflight.mjs --no-tests`（版本 / badge / 链接 / 文件一致性）→ `npm pack --dry-run`（发布白名单）。全部离线，**不需要配置任何密钥**。
+每个组合依次执行：`npm test`（离线自测）→ `node scripts/preflight.mjs --no-tests`（版本 / badge / 链接 / 文件一致性）→ `npm run pack-check -- --quiet`（打包 + 在独立目录安装 + 跑 bin 的安装演练）。全部离线，**不需要配置任何密钥**。
 
 本地想复刻同样的三步：
 
 ```bash
-npm test && node scripts/preflight.mjs --no-tests && npm pack --dry-run
+npm test && node scripts/preflight.mjs --no-tests && npm run pack-check -- --quiet
 ```
 
 查看最近一次运行：`gh run list -R 2647422139-maker/pcause --limit 5`，或点 README 顶部的 CI badge。
+
+## 4.4 npm 发布演练（v1.12）
+
+`npm run pack-check` 回答一个 CI 回答不了的问题：**「用户装上之后，真的能用吗？」**
+
+| 检查 | 怎么验 |
+| --- | --- |
+| 打包能成 | 真的执行 `npm pack`，拿到 `pcause-x.y.z.tgz` |
+| 文件齐全 | tarball 必须含 `src/`、`schema/`、`examples/`、`docs/`、`scripts/`、`README`、`CHANGELOG`、`LICENSE` |
+| 不含杂物 | `.pcause/`、`test/`、`.github/`、`node_modules/`、`pcause.config.json` 一律不得进入发布包 |
+| 装得上 | 在**独立空临时项目**里 `npm install ./pcause-x.y.z.tgz --ignore-scripts` |
+| 版本对 | 安装后的 `node_modules/pcause/package.json` 版本 = 仓库版本 |
+| bin 能跑 | 通过 `node_modules/.bin/pcause` shim 跑 `version` 与 `help`；再绕过 shim 用 `node` 直接跑一次 |
+| shebang 完好 | 安装包内 `src/cli.mjs` 的首行必须是 `#!/usr/bin/env node\n`（LF，不被 CRLF 破坏） |
+
+```bash
+npm run pack-check              # 10 项检查，几秒，产物自动清理
+node scripts/pack-check.mjs --keep   # 保留临时目录与 tgz，便于自己翻看
+```
+
+本次演练实际抓到的问题：`files` 白名单漏了 `scripts/`，导致安装后 `npm run preflight` 报文件不存在；已修复并把 `scripts/` 加进白名单。包名可用性另行确认（`npm view pcause` 返回 404，未被占用）。
 
 ## 5. 命令
 
