@@ -3,6 +3,17 @@
 > 本文件收录 README 中移出的各版本更新摘要，按时间倒序。
 > 机器可读的版本变更见 [CHANGELOG.md](../CHANGELOG.md)；最新摘要见 [README](../README.md#更新日志)。
 
+## v1.21 更新摘要
+
+插件机制早就有，但一直只靠示例代码和 README 里两行说明，用户要读源码才知道契约。v1.21 把它补成正式文档 `docs/plugins.md`：
+
+- 配置怎么找（`--config` → `PCAUSE_CONFIG` → 当前目录 `pcause.config.json`）、`module` 相对配置文件解析、保留名不可覆盖。
+- Provider 只需 `generate({ system, user, ctx }) → string`；Judge 只需 `judgeBatch(pairs, ctx) → 等长 [{changed, reason}]`。
+- 预算与缓存由核心统一记账：一次 generate / 一个判定批次 = 1 次调用；判定批大小默认 6，判定与复核串行。
+- 6 个常见坑：ESM/CJS、路径基准、模块进程内缓存、等长返回、stdout 被日志污染、options 里别放密钥。
+
+总自测 258 项，preflight 13/13，安装演练 10/10。
+
 ## v1.20 更新摘要
 
 Windows 是这类工具最容易翻车的平台：路径里有空格、有中文、有正斜杠和反斜杠混用、偶尔还超过 260 字符。v1.20 不新增功能，只把这几种真实场景固化成回归测试。

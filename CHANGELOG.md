@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.21.0] - 2026-11-07
+
+### Added
+
+- 新增 `docs/plugins.md` 插件开发指南：配置文件查找顺序与相对路径基准、Provider（`generate({system,user,ctx})`→string）与 Judge（`judgeBatch(pairs,ctx)`→等长 `[{changed,reason}]`）契约、预算/缓存/并发由核心统一负责的口径、调试与自测建议、6 个常见坑（ESM/CJS、路径基准、模块缓存、等长返回、stdout 污染、options 里的密钥）。
+- README 新增「8.1 自定义 Provider / Judge（插件）」并链接到指南；目录树补该文档。
+- 新增 7 项自测（文档存在与体量、两个契约、配置与路径基准、预算记账、ESM 坑、stderr 提醒、README 链接），总自测 258 项。
+
 ## [0.20.0] - 2026-11-07
 
 ### Added

@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-251%2F251%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-258%2F258%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -85,7 +85,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 251/251 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 258/258 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -372,13 +372,17 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  221 项离线自测
+├── test/selftest.mjs  257 项离线自测
 ├── scripts/           发布前自检：preflight（版本/链接/文件一致性）、pack-check（安装演练）、release-check（发布检查单）
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
-├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
+├── docs/              演示报告（HTML / Markdown）、演示 JSON、归因对比演示、[插件开发指南](docs/plugins.md)
 ├── CHANGELOG.md       版本变更历史（Keep a Changelog 轻量格式）
 └── package.json
 ```
+
+## 8.1 自定义 Provider / Judge（插件）
+
+不想用内置通道（mock / deepseek / doubao）时，可以用本地插件接入自己的模型、网关或判定规则：在 `pcause.config.json` 里注册模块，然后 `pcause attribute --provider <名字> --judge <名字>`。契约、配置解析规则、预算与缓存语义、6 个常见坑都写在 [docs/plugins.md](docs/plugins.md)。
 
 ## 9. 已知限制
 

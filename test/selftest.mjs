@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.20.0', '版本号升到 0.20.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.21.0', '版本号升到 0.21.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.20.0'), 'CLI 版本号与 package.json 同步（0.20.0）');
+check(String(cliVersion.stdout).includes('0.21.0'), 'CLI 版本号与 package.json 同步（0.21.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.20.0', '任意 cwd 下 version 不依赖工作目录（0.20.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.21.0', '任意 cwd 下 version 不依赖工作目录（0.21.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -880,6 +880,18 @@ const demoOther = runAt(os.tmpdir(), ['demo', '--json']);
 let demoJson = null;
 try { demoJson = JSON.parse(demoOther.stdout); } catch {}
 check(demoOther.status === 0 && !!demoJson && path.isAbsolute(demoJson.mdPath), '任意 cwd 下 demo --json 可用且报告路径为绝对路径');
+
+// ===== [30/30] v1.21 插件开发指南 =====
+const pluginsDoc = path.join(PKG_ROOT, 'docs', 'plugins.md');
+const pd = fs.existsSync(pluginsDoc) ? fs.readFileSync(pluginsDoc, 'utf8') : '';
+check(pd.length > 2500, 'docs/plugins.md 存在且有实质内容');
+check(pd.includes('generate({ system, user, ctx })') && pd.includes('judgeBatch(pairs, ctx)'), '插件文档覆盖 Provider / Judge 两个契约');
+check(pd.includes('pcause.config.json') && pd.includes('相对配置文件所在目录'), '插件文档说明配置格式与相对路径基准');
+check(pd.includes('各记 1 次'), '插件文档说明预算记账口径');
+check(pd.includes('ESM / CJS'), '插件文档列出 ESM/CJS 常见坑');
+check(pd.includes('stderr'), '插件文档提醒调试日志不要污染 stdout');
+const readmePlugins = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readmePlugins.includes('docs/plugins.md'), 'README 链接到插件开发指南');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
