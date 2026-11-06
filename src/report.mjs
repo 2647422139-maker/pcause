@@ -1,6 +1,6 @@
 // 报告生成：Markdown（可贴进 PR / 文档）与独立 HTML（可直接双击打开）
 import { VERDICT_LABEL } from './attribute.mjs';
-import { CAVEATS, KIND_LABEL, KIND_CONFIDENCE } from './schema.mjs';
+import { CAVEATS, KIND_LABEL, KIND_CONFIDENCE, KIND_JUDGE_NOTE } from './schema.mjs';
 
 const esc = (s) =>
   String(s ?? '')
@@ -86,6 +86,7 @@ export function buildMarkdown(attr) {
   lines.push(`| 假设可信度 | ${conf.label}：${conf.note} |`);
   lines.push(`| 生成模型 | ${attr.provider.name} / ${attr.provider.model}（temperature=${attr.provider.temperature}） |`);
   lines.push(`| 判定器 | ${attr.judge.name}${attr.verify ? `（第二意见：${attr.verify.name}）` : ''} |`);
+  lines.push(`| 判定维度 | ${KIND_JUDGE_NOTE[attr.kind] || KIND_JUDGE_NOTE.prompt} |`);
   lines.push(`| 探针数 | ${attr.probes.length} |`);
   lines.push(`| 每探针采样 | ${attr.samples} 次 |`);
   lines.push(`| 采样策略 | ${attr.samplingPolicy || `固定采样：每探针每版本 ${attr.samples} 次`} |`);
@@ -300,6 +301,7 @@ export function buildHtml(attr) {
     <div class="card"><div class="k">归因对象</div><div class="v">${esc(KIND_LABEL[kind] || kind)}</div><div class="note">假设可信度：${esc(conf.label)}</div></div>
     <div class="card"><div class="k">生成模型</div><div class="v">${esc(attr.provider.name)} / ${esc(attr.provider.model)}</div></div>
     <div class="card"><div class="k">判定器</div><div class="v">${esc(attr.judge.name)}${attr.verify ? ' + ' + esc(attr.verify.name) : ''}</div></div>
+    <div class="card"><div class="k">判定维度（${esc(KIND_LABEL[attr.kind] || KIND_LABEL.prompt)}）</div><div class="v">${esc(KIND_JUDGE_NOTE[attr.kind] || KIND_JUDGE_NOTE.prompt)}</div></div>
     <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">${attr.probes.length} / ${attr.samples} / ${attr.hunks.length}</div>${attr.earlyStop ? `<div class="note">自适应：先测 ${attr.minSamples} 次</div>` : ''}</div>
     ${attr.earlyStop ? `<div class="card"><div class="k">采样策略</div><div class="v">自适应（先测 ${attr.minSamples} 次）</div><div class="note">仅在结论含糊或噪声偏高时补到 ${attr.samples} 次</div></div>` : ''}
     <div class="card"><div class="k">噪声地板</div><div class="v">${attr.noiseFloor == null ? '未测' : pct(attr.noiseFloor)}</div></div>

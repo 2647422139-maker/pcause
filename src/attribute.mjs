@@ -151,8 +151,8 @@ export async function attribute(opts, ctx = {}) {
     cache: opts.cache !== false,
     config: opts.config,
   });
-  const judge = makeJudge(opts.judge, { model: opts.judgeModel, cache: opts.cache !== false, config: opts.config });
-  const verifyJudge = opts.verify ? makeJudge(opts.verify, { model: opts.verifyModel, cache: opts.cache !== false, config: opts.config }) : null;
+  const judge = makeJudge(opts.judge, { model: opts.judgeModel, cache: opts.cache !== false, config: opts.config, kind });
+  const verifyJudge = opts.verify ? makeJudge(opts.verify, { model: opts.verifyModel, cache: opts.cache !== false, config: opts.config, kind }) : null;
 
   const budget = { max: maxCalls, used: 0 };
   // 判定器内部同样会调用模型（deepseek / doubao），必须计入预算，

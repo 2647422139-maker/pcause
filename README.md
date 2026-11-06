@@ -3,7 +3,22 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-113%2F113%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-126%2F126%20passing-brightgreen)
+
+## v1.6 更新摘要
+
+`--kind` 从「报告元标签」升级为**判定维度适配**：判定器按归因对象类型换用不同的判定重点（`--kind prompt` 的判定提示词逐字不变，历史行为与缓存不受影响）。
+
+- **system（系统提示）**：看「守不守规则」——角色边界、安全拒答、工具与权限约束、输出格式刚性、上下文隔离；同时要求把「规则内的合理变通」「异常分支返回错误文本」「拒答措辞差异」判为无行为变化。
+- **agent（Agent 指令）**：看「活有没有干对」——任务达成度、工具调用策略、终止条件、状态与上下文延续、副作用风险；并明确多步探索 / 多次工具调用本身不算失败。
+- 判定维度同时写进 Markdown / HTML 报告的「判定维度」行，审阅时知道这一轮用的是哪套眼镜。
+- 判定提示词按 kind 分流后，模型通道的内容寻址缓存天然按 kind 分开，不会串用。
+- 自测现为 **126/126**（新增 13 项：三类判定提示词内容、未知 kind 回退、heuristic 行为不受 kind 影响、报告披露、版本号）。
+
+```bash
+pcause attribute --old start-v1 --new start-v2 --probes probes.jsonl \
+  --kind system --provider deepseek --judge deepseek --verify doubao --samples 2
+```
 
 ## v1.5 更新摘要
 
@@ -19,7 +34,7 @@ pcause attribute --old triage-v1 --new triage-v2 --probes examples/probes.jsonl 
 - **不引入循环反馈**：停止判断只用**未校正的原始变化率**，噪声校正在采样决策之后进行（用校正值做决策会让方差更大的估计反过来影响采样）。
 - **阈值固定、不事后调**：含糊区间 10%~70%、噪声地板 15% 写死在 `src/sampling.mjs`，避免「看结果再调阈值」。
 - **如实披露**：报告与 `--json` 写明采样策略、哪些块提前停止、哪些块补采样、每块实际采样次数（`samplesUsed` / `extended`），并提示截断偏倚风险。
-- 自测现为 **113/113**（新增 19 项：阈值判定、提前停止省调用、含糊块补采样、schema / 报告披露、CLI 参数与 dry-run 上下限）。
+- 自测当时为 **113/113**（v1.6 起为 126/126）。
 
 ## v1.4 更新摘要
 
@@ -122,7 +137,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 113/113 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 126/126 项离线自测，不联网、不花钱
 ```
 
 生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经本机 `doubao-bridge` 技能，无需任何 API Key）。
@@ -200,7 +215,7 @@ pcause selftest                               离线自测
 | `--provider mock\|deepseek\|doubao` | 生成模型（默认 deepseek） |
 | `--judge heuristic\|deepseek\|doubao` | 判定器（默认 heuristic） |
 | `--verify <judge>` | 第二意见判定器，如 `--verify doubao` |
-| `--kind prompt\|system\|agent` | 归因对象类型（默认 prompt；只影响报告里的假设可信度提示，不改变判定逻辑） |
+| `--kind prompt\|system\|agent` | 归因对象类型（默认 prompt；影响判定器使用的判定维度与报告里的假设可信度提示，v1.6 起 system/agent 有专用判定重点） |
 | `--samples <n>` | 每探针独立生成 n 次（默认 1；**≥2 才会测噪声地板并校正，推荐 2~3**） |
 | `--early-stop` | 采样提前停止：先测 `--min-samples` 次，仅在结论含糊或噪声偏高时补采样到 `--samples` 次（见 v1.5） |
 | `--min-samples <n>` | 自适应采样的首轮次数（默认 2，需配合 `--early-stop` 且 ≤ `--samples`） |
@@ -250,6 +265,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 3. v1.2 的第一项按 roadmap 落地为 `compare`，其设计又回到豆包确认：签名必须包含探针集、采样数、生成器与判定器；对比时最容易翻车的是「只比 verdict、忽略 hunk 对齐错位」，所以实现用内容做主键、只比同一改动块的前后结论。
 4. v1.3 的并发设计同样先问过豆包：预算按**发起前预占**而不是等完成后再扣，否则 in-flight 请求会让预算透支；并发上限必须单独用 `--concurrency` 控制，不能拿预算当并发数用。它还提醒「重跑要按已完成采样点跳过、输出按固定序号排序」——pcause 用内容寻址缓存 + `(探针, 采样)` 固定落位实现，不需要额外状态文件。
 5. v1.4 的插件接口同样先与豆包对表：接口保持「Provider 只有 `generate`、Judge 只有 `judgeBatch`、`ctx` 只传只读配置」；它指出的头号风险是插件自行发起请求或递归调内部逻辑从而绕过核心的调用计数与缓存——因此 pcause 把预算与缓存收在核心包装层（一次 generate / 一个判定批次记 1 次调用），并要求插件名不得覆盖内置通道。本地插件的安全边界也写进了限制（可执行代码，只加载显式声明的本地文件）。
+6. v1.6 的判定维度适配由豆包先给结构：它主张 system 与 agent 是两种责任面——system 只看「守不守规则」、agent 只看「活有没有干对」，其余维度（话术润色、角色人设等）都该裁掉；并给了三类高频误判（规则内的合理变通被当越界、异常分支被硬卡格式、需要多步探索的任务被判失败）。实现采纳它的「阶段 1」建议：只做提示词分流、对外 schema 零改动、`--kind prompt` 逐字不变；结构化分维度打分与「system 违规一票否决 agent」的分层流水线留作后续演进。
 
 ## 8. 目录结构
 
@@ -269,7 +285,7 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  113 项离线自测
+├── test/selftest.mjs  126 项离线自测
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json
@@ -279,7 +295,7 @@ pcause/
 
 - **归因以 hunk 为单位，且假设改动块相互独立**：两处耦合改动如果落在同一 hunk，无法分开归因；更隐蔽的是，若 h3 依赖 h1 引入的文本（例如 h1 定义了一个术语、h3 使用它），单独回退 h1 会让提示词自相矛盾，此时输出的变化来自「文本残缺」而不是该改动的真实因果。建议改提示词时一行一条要求、避免跨块引用；对耦合很强的改动，把相关行放进同一个 hunk（相邻行会被自动合并）。
 - **本分析不检测改动之间的交互效应**：A、B 单独都没事、同时改才翻车的情况，需要组合实验（复杂度指数级），当前版本在报告里明确声明不覆盖。
-- **假设可信度随归因对象类型变化**：`--kind` 只是元标签 + 报告提示，并不会自动让判定逻辑适配系统提示 / 工具定义 / RAG 模板；这些对象的判定语义不同，直接套用普通提示词结论会把关联误当因果。
+- **假设可信度随归因对象类型变化**：`--kind` 会切换判定器的判定重点（system 看规则边界、agent 看任务推进），但它仍是**提示词级适配**：不改变探针集、生成参数、采样阈值与判定阈值，也不做结构化分维度打分（模型只回 changed + 一句话理由）。因此不同 kind 的结论强度不能直接横向比较；系统提示 / Agent 指令的结论建议结合对应维度的证据人工复核。
 - **探针选择决定结论**：探针覆盖不到的场景，改动会显示「无影响」。工具给的是探针分布上可测的影响，不是宇宙真理。
 - **判定器仍可能出错**：LLM 判定会有误判；`heuristic` 用中文 bigram + 英文词的 Jaccard 相似度（阈值 0.9），对改写仍可能过敏，决定性结论建议结合报告里的原文证据人工复核。
 - **豆包通道需要桌面版保持登录并带调试端口运行**（`start-doubao-debug.cmd`），每次调用约 6–13 秒，依赖界面 DOM，可能随版本变化失效；子进程有硬超时保护。

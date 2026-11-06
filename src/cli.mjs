@@ -39,7 +39,7 @@ attribute 选项：
   --model <name>                    模型名（deepseek 默认 deepseek-flash）
   --judge heuristic|deepseek|doubao 判定器（默认 heuristic）
   --verify <judge>                  用第二个模型做第二意见复核，如 --verify doubao
-  --kind prompt|system|agent        归因对象类型（默认 prompt；影响报告里的假设可信度提示）
+  --kind prompt|system|agent        归因对象类型（默认 prompt；影响判定器使用的判定维度与报告里的假设可信度提示）
   --samples <n>                     每个探针独立生成 n 次（默认 1；≥2 时自动测噪声地板并做校正，推荐 2~3）
   --early-stop                      采样提前停止：先测 --min-samples 次，仅在结论含糊/噪声偏高时补采样到 --samples
   --min-samples <n>                 自适应采样的首轮次数（默认 2；需配合 --early-stop，且 ≤ --samples）
@@ -439,7 +439,7 @@ async function main() {
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.6.0');
+      tick('pcause 0.7.0');
       return 0;
     case 'help':
     case '--help':

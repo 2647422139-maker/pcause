@@ -8,6 +8,13 @@ export const KINDS = ['prompt', 'system', 'agent'];
 
 export const KIND_LABEL = { prompt: '用户提示词', system: '系统提示', agent: 'Agent 指令' };
 
+// v1.6：--kind 不只影响报告提示，也会让判定器换用对应判定维度（见 judge.mjs judgeSystemFor）。
+export const KIND_JUDGE_NOTE = {
+  prompt: '通用实质行为差异（结构 / 指令遵守 / 核心主张 / 语气范式 / 信息量）',
+  system: '系统提示专用：角色边界 / 安全拒答 / 工具与权限约束 / 输出格式刚性 / 上下文隔离',
+  agent: 'Agent 专用：任务达成度 / 工具调用策略 / 终止条件 / 状态与上下文延续 / 副作用风险',
+};
+
 // 静态查表得出的假设可信度：不做动态评分，避免让用户误解为统计置信度。
 export const KIND_CONFIDENCE = {
   prompt: {

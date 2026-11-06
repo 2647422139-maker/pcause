@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.6.0', '版本号升到 0.6.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.7.0', '版本号升到 0.7.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -542,6 +542,42 @@ try {
 }
 check(dryEarly.status === 0 && dryEarlyJson?.plan?.earlyStop === true && dryEarlyJson?.plan?.minSamples === 2, 'CLI 接受并透出 --early-stop / --min-samples');
 check(dryEarlyJson?.plan?.plannedCallsMin < dryEarlyJson?.plan?.plannedCalls, 'dry-run 给出调用量上下限');
+
+console.log('\n[16/16] v1.6：--kind 判定维度适配');
+const { judgeSystemFor, makeJudge: mkJudge } = await import('../src/judge.mjs');
+const { KIND_JUDGE_NOTE } = await import('../src/schema.mjs');
+
+const judgePrompt = judgeSystemFor('prompt');
+check(judgePrompt.includes('结构或格式不同') && judgePrompt.includes('核心主张'), '--kind prompt 判定提示词保持原维度（逐字不变）');
+check(!judgePrompt.includes('角色边界合规') && !judgePrompt.includes('任务目标达成度'), '--kind prompt 不注入 system/agent 专用维度');
+
+const judgeSystemText = judgeSystemFor('system');
+check(judgeSystemText.startsWith(judgePrompt) && judgeSystemText.includes('角色边界合规') && judgeSystemText.includes('安全拒答约束执行'), 'system 判定注入角色边界与安全拒答维度');
+check(judgeSystemText.includes('容易误判') && judgeSystemText.includes('合理变通'), 'system 判定提示误判边界');
+
+const judgeAgentText = judgeSystemFor('agent');
+check(
+  judgeAgentText.includes('任务目标达成度') && judgeAgentText.includes('工具调用策略') && judgeAgentText.includes('终止条件判断正确性') && judgeAgentText.includes('状态与上下文延续正确性'),
+  'agent 判定注入任务/工具/终止/状态维度'
+);
+check(judgeAgentText.includes('副作用与权限风险'), 'agent 判定包含副作用风险维度');
+check(judgeSystemFor('bogus') === judgePrompt, '未知 kind 回退到 prompt 判定提示词');
+
+const kindPair = [{ a: 'abc', b: 'xyz' }];
+const hjDefault = await mkJudge('heuristic', {}).judgeBatch(kindPair);
+const hjSystem = await mkJudge('heuristic', { kind: 'system' }).judgeBatch(kindPair);
+check(JSON.stringify(hjDefault) === JSON.stringify(hjSystem), 'heuristic 判定行为不因 --kind 改变（prompt 行为不变）');
+
+check(KIND_JUDGE_NOTE.system.includes('角色边界') && KIND_JUDGE_NOTE.agent.includes('任务达成度'), '报告用判定维度说明与判定提示一致');
+
+const mdKindSystem = buildMarkdown(attrSystem);
+check(mdKindSystem.includes('判定维度') && mdKindSystem.includes('角色边界'), 'Markdown 报告披露 system 专用判定维度');
+check(buildHtml(attrSystem).includes('判定维度'), 'HTML 报告披露判定维度');
+const mdKindPrompt = buildMarkdown(attr);
+check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
+
+const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
+check(String(cliVersion.stdout).includes('0.7.0'), 'CLI 版本号更新为 0.7.0');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
