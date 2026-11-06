@@ -1,0 +1,4 @@
+node_modules/
+.pcause/
+*.log
+.DS_Store

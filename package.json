@@ -1,0 +1,17 @@
+{
+  "name": "pcause",
+  "version": "0.1.0",
+  "description": "Prompt 因果归因器：用反事实消融实验测出提示词改动里哪一块真正改变了模型行为",
+  "type": "module",
+  "bin": {
+    "pcause": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node test/selftest.mjs",
+    "demo": "node src/cli.mjs attribute --old triage-v1 --new triage-v2 --probes examples/probes.jsonl --provider deepseek --model deepseek-flash --judge deepseek --verify doubao --samples 2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
