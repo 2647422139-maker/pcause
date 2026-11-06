@@ -2,6 +2,20 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.11.0] - 2026-11-07
+
+### Added
+
+- GitHub Actions CI（`.github/workflows/ci.yml`）：Node 20 / 22 × Ubuntu / Windows 四个组合，外加 Node 24 在 Ubuntu 上的前瞻验证；每个组合跑 `npm test`（离线自测）、`node scripts/preflight.mjs --no-tests`（版本 / badge / 链接 / 文件一致性）、`npm pack --dry-run`（发布白名单）。
+- 触发规则：push 到 `main`、所有 `pull_request`、手动 `workflow_dispatch`；`permissions: contents: read` 最小权限；`concurrency` 在 PR 上取消旧运行、在 `main` 上保留历史运行。
+- README 顶部 CI badge 与「4.3 持续集成」说明；README 记录 v1.11 摘要。
+- 自测新增 CI 配置检查（174 项）。
+
+### Changed
+
+- 版本升到 0.11.0。
+- 采纳讨论建议：去掉冗余的 `node --version` 步骤；不为零依赖项目启用缓存；Node 24 不全平台铺开，只在 Linux 做前瞻验证。
+
 ## [0.10.0] - 2026-11-07
 
 ### Added

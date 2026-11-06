@@ -3,7 +3,19 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-162%2F162%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-174%2F174%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.11 更新摘要
+
+持续集成：把「本地能过」升级成「每个平台、每个 Node 版本都能过」，并且不再靠人工记得跑。
+
+- **矩阵**：Node 20 / 22 × Ubuntu / Windows 共 4 个组合，外加 Node 24 在 Ubuntu 上的前瞻验证（避开 Windows + 24 偶发的 runner 不稳定）；`fail-fast: false`，一个组合失败不影响其他组合出结果。
+- **离线即可验证**：CI 里跑 `npm test`（离线自测）、`node scripts/preflight.mjs --no-tests`（版本 / badge / 链接 / 文件一致性）、`npm pack --dry-run`（发布白名单）；**不需要任何密钥，不联网调模型**。
+- **按需触发**：push 到 `main`、所有 PR、手动 `workflow_dispatch`；`permissions: contents: read` 最小权限；`concurrency` 让 PR 上的新推送取消旧运行，而 `main` 上的运行保留便于追踪。
+- **零依赖不做缓存**：没有 lockfile / node_modules，加缓存只有开销没有收益。
+- 踩过的坑（豆包建议采纳）：`node --version` 这类步骤是日志噪音，删掉；Node 24 全平台铺开性价比低；`npm pack --dry-run` 不校验 `exports`，本仓库只暴露 `bin` 所以足够。
+- 状态徽章：README 顶部新增 CI badge，点开即最近一次矩阵运行。
+- 自测 **174/174**（新增 12 项：workflow 存在、触发规则、矩阵版本与平台、最小权限、并发策略、三步检查、无密钥引用、无 tab 缩进、README CI badge 与 v1.11 记录）。
 
 ## v1.10 更新摘要
 
@@ -14,7 +26,7 @@
 - **链接不悬空**：README 的本地链接目标必须存在；带 `#锚点` 的 Markdown 链接会用 GitHub 风格 slug 校验标题真实存在（HTTP 外链不做联网检查，保持离线）。
 - **承诺文件齐全**：`docs/demo-*`、`schema/`、`examples/`、`LICENSE` 等 README 里承诺存在的文件必须都在；`package.json` 的 `files` 白名单必须覆盖 `src/schema/examples/docs`；`bin` 入口能跑 `version` / `help`。
 - 用法：`npm run preflight`（默认含自测，约数秒）；`node scripts/preflight.mjs --no-tests --quiet` 只做静态检查。失败时逐项列出原因并退出码 1。
-- 自测 **162/162**（新增 9 项：版本解析跳过 Unreleased、badge 两种写法解析、自测输出解析、本地链接提取、标题 slug、本仓库 preflight 通过）。
+- 自测 **162/162**（当时计数；新增 9 项：版本解析跳过 Unreleased、badge 两种写法解析、自测输出解析、本地链接提取、标题 slug、本仓库 preflight 通过；v1.11 起为 174/174）。
 
 ## v1.9 更新摘要
 
@@ -23,7 +35,7 @@
 - **统一错误出口** `src/errors.mjs`：所有运行错误带稳定错误码，例如 `PCAUSE_NOT_FOUND`（文件/快照/归因不存在）、`PCAUSE_INPUT`（探针文件格式错）、`PCAUSE_KIND`（`--kind` 拼错）、`PCAUSE_NO_DIFF`（两份提示词没差异——这是正常结果，明确说明）、`PCAUSE_PLUGIN`（未知 provider）、`PCAUSE_ENV`（缺 Key / 找不到豆包桥接）、`PCAUSE_REQUEST`（模型请求失败，多半可重试）、`PCAUSE_EMPTY_OUTPUT`（思考模型把预算用光）、`PCAUSE_INTERNAL`（内部不一致，建议反馈）、`PCAUSE_UNKNOWN_COMMAND`。
 - **报错只写 stderr、stdout 零污染**：默认输出「✖ [PCAUSE_xxx] 一句话原因」+「提示：下一步怎么做」；`--json` 输出的 stdout 仍然可以直接 `JSON.parse`。
 - **调试开关**：`PCAUSE_DEBUG=1` 才追加堆栈（默认隐藏内部细节）；`--help` 新增「出错时的诊断」与 `PCAUSE_CONFIG` / `PCAUSE_DEBUG` 说明。
-- 自测 **153/153**（新增 12 项：码格式、堆栈开关、未初始化 / 缺探针 / 未知 provider / 无差异 / 未知命令的码与退出码、stdout 不被污染、help 披露调试开关；v1.10 起为 162/162）。
+- 自测 **153/153**（新增 12 项：码格式、堆栈开关、未初始化 / 缺探针 / 未知 provider / 无差异 / 未知命令的码与退出码、stdout 不被污染、help 披露调试开关；v1.10 起为 162/162，v1.11 起为 174/174）。
 
 ```text
 ✖ [PCAUSE_NOT_FOUND] 找不到探针文件：nope.jsonl
@@ -182,7 +194,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 162/162 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 174/174 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -294,6 +306,25 @@ echo $?                                            # 0 全部通过；1 有检�
 ```
 
 输出逐项 `✓/✗`，失败时列出具体原因（哪个链接缺失、badge 差多少、哪个版本对不上），不做任何联网检查。
+
+## 4.3 持续集成（v1.11）
+
+仓库自带 `.github/workflows/ci.yml`，push 到 `main`、发起 PR 或手动触发时自动跑：
+
+| 组合 | 平台 | Node |
+| --- | --- | --- |
+| 主干兼容 | Ubuntu / Windows | 20、22 |
+| 前瞻验证 | Ubuntu | 24 |
+
+每个组合依次执行：`npm test`（离线自测）→ `node scripts/preflight.mjs --no-tests`（版本 / badge / 链接 / 文件一致性）→ `npm pack --dry-run`（发布白名单）。全部离线，**不需要配置任何密钥**。
+
+本地想复刻同样的三步：
+
+```bash
+npm test && node scripts/preflight.mjs --no-tests && npm pack --dry-run
+```
+
+查看最近一次运行：`gh run list -R 2647422139-maker/pcause --limit 5`，或点 README 顶部的 CI badge。
 
 ## 5. 命令
 

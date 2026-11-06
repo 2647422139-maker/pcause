@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.10.0', '版本号升到 0.10.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.11.0', '版本号升到 0.11.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.10.0'), 'CLI 版本号与 package.json 同步（0.10.0）');
+check(String(cliVersion.stdout).includes('0.11.0'), 'CLI 版本号与 package.json 同步（0.11.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -660,6 +660,23 @@ const pfRun = spawnSync(process.execPath, [path.join(PKG_ROOT, 'scripts', 'prefl
   cwd: PKG_ROOT,
 });
 check(pfRun.status === 0, '对当前仓库运行 preflight --no-tests 全部通过');
+
+console.log('\n[21/21] v1.11：GitHub Actions CI（.github/workflows/ci.yml）');
+const ciPath = path.join(PKG_ROOT, '.github', 'workflows', 'ci.yml');
+check(fs.existsSync(ciPath), 'CI workflow 文件存在');
+const ciText = fs.readFileSync(ciPath, 'utf8');
+check(ciText.includes('branches: [main]') && ciText.includes('pull_request:') && ciText.includes('workflow_dispatch:'), '触发规则：push main + pull_request + 手动触发');
+check(ciText.includes("node: ['20', '22']") && ciText.includes("node: '24'"), '矩阵覆盖 Node 20/22，并前瞻验证 Node 24');
+check(ciText.includes('ubuntu-latest') && ciText.includes('windows-latest'), '矩阵覆盖 Linux 与 Windows');
+check(ciText.includes('permissions:') && ciText.includes('contents: read'), '最小权限：只读 contents');
+check(ciText.includes('group: ${{ github.workflow }}-${{ github.ref }}') && ciText.includes('cancel-in-progress: ${{ github.event_name =='), '并发取消策略：PR 取消旧运行、main 保留');
+check(/run: npm test/.test(ciText), 'CI 跑离线自测');
+check(ciText.includes('node scripts/preflight.mjs --no-tests'), 'CI 跑发布前静态检查');
+check(ciText.includes('npm pack --dry-run'), 'CI 验证发布包白名单');
+check(!ciText.includes('secrets.'), 'CI 不引用任何密钥');
+check(!ciText.includes('\t'), 'workflow 不含 tab 缩进（YAML 合法前提）');
+const readmeCi = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && readmeCi.includes('v1.11 更新摘要'), 'README 展示 CI badge 并记录 v1.11');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

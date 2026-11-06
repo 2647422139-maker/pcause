@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同一分支同一工作流只保留一个运行：PR 上取消旧运行，main 上让旧运行跑完便于追踪
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '22']
+        include:
+          # Node 24 只在前瞻验证的 Linux 上跑，避免 Windows 24 偶发的 runner 不稳定
+          - os: ubuntu-latest
+            node: '24'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # 零依赖项目没有 lockfile，缓存 node_modules 无意义，故不启用 cache
+          node-version: ${{ matrix.node }}
+
+      - name: Offline selftest
+        run: npm test
+
+      - name: Release preflight (static checks)
+        run: node scripts/preflight.mjs --no-tests
+
+      - name: Packaging sanity (npm pack --dry-run)
+        run: npm pack --dry-run
