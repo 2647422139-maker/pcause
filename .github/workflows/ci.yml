@@ -22,11 +22,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # 固定到显式镜像标签（不是 latest），消除 ubuntu-latest/windows-latest 跨 OS
+        # 大版本迁移带来的「同一 commit 两次结果不同」噪音。注意：固定 label 不等于
+        # 固定镜像快照，GitHub 仍会在同一 label 内滚动预装工具——只是不会跨大版本跳。
+        # 升级节奏：① 关注 actions/runner-images 的 deprecation/brownout 公告；
+        # ② 需要新预装工具或安全修复时，先在独立 PR 里把标签替换为候选版本跑一遍再合并。
+        os: [ubuntu-24.04, windows-2022]
         node: ['20', '22']
         include:
           # Node 24 只在前瞻验证的 Linux 上跑，避免 Windows 24 偶发的 runner 不稳定
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             node: '24'
     steps:
       - name: Checkout

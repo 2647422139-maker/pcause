@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.15.0] - 2026-11-07
+
+### Changed
+
+- CI 矩阵从浮动标签 `ubuntu-latest` / `windows-latest` 改为固定镜像 `ubuntu-24.04` / `windows-2022`，消除 runner 跨 OS 大版本迁移导致的不可复现噪音（例如 ubuntu-latest 向 Ubuntu 26 迁移的公告）。
+- workflow 注释写明固定原因、`固定标签 ≠ 镜像快照` 的边界，以及「关注 runner-images 公告 → 独立 PR 换候选标签 → 跑绿再合并」的升级节奏。
+- 新增 3 项自测：矩阵必须是固定标签、不得出现 `*-latest`、workflow 注释必须包含 pin 原因与升级节奏；总自测 205 项。
+
 ## [0.14.0] - 2026-11-07
 
 ### Changed

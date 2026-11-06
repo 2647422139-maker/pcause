@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.14.0', '版本号升到 0.14.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.15.0', '版本号升到 0.15.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.14.0'), 'CLI 版本号与 package.json 同步（0.14.0）');
+check(String(cliVersion.stdout).includes('0.15.0'), 'CLI 版本号与 package.json 同步（0.15.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -667,7 +667,7 @@ check(fs.existsSync(ciPath), 'CI workflow 文件存在');
 const ciText = fs.readFileSync(ciPath, 'utf8');
 check(ciText.includes('branches: [main]') && ciText.includes('pull_request:') && ciText.includes('workflow_dispatch:'), '触发规则：push main + pull_request + 手动触发');
 check(ciText.includes("node: ['20', '22']") && ciText.includes("node: '24'"), '矩阵覆盖 Node 20/22，并前瞻验证 Node 24');
-check(ciText.includes('ubuntu-latest') && ciText.includes('windows-latest'), '矩阵覆盖 Linux 与 Windows');
+check(ciText.includes('ubuntu-24.04') && ciText.includes('windows-2022'), '矩阵覆盖 Linux 与 Windows（固定镜像标签）');
 check(ciText.includes('permissions:') && ciText.includes('contents: read'), '最小权限：只读 contents');
 check(ciText.includes('group: ${{ github.workflow }}-${{ github.ref }}') && ciText.includes('cancel-in-progress: ${{ github.event_name =='), '并发取消策略：PR 取消旧运行、main 保留');
 check(/run: npm test/.test(ciText), 'CI 跑离线自测');
@@ -680,6 +680,9 @@ check(ciText.includes('actions/checkout@v5') && ciText.includes('actions/setup-n
 check(!/actions\/(checkout|setup-node)@v[0-4]/.test(ciText), 'CI 不残留 checkout/setup-node 的 v4 及更老版本引用');
 check(ciText.includes('node-version: ${{ matrix.node }}'), 'setup-node 仍按矩阵设置 Node 版本');
 check(ciText.includes('package-manager-cache: false'), 'setup-node v5 显式关闭自动 npm 缓存（零依赖无 lockfile）');
+check(ciText.includes('os: [ubuntu-24.04, windows-2022]'), '矩阵使用固定镜像标签 ubuntu-24.04 / windows-2022（避免 latest 跨大版本迁移抖动）');
+check(!/os: \[[^\]]*latest/.test(ciText), '矩阵不再使用 *-latest 浮动标签');
+check(ciText.includes('固定 label 不等于') || ciText.includes('升级节奏'), 'workflow 注释写清 pin 原因与升级节奏');
 check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && readmeCi.includes('v1.11 更新摘要'), 'README 展示 CI badge 并记录 v1.11');
 check(readmeCi.includes('v1.14 更新摘要'), 'README 记录 v1.14（Actions v5 升级）');
 

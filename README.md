@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-202%2F202%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-205%2F205%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.15 更新摘要
+
+CI 的可复现性：不再追 `ubuntu-latest` / `windows-latest` 这类浮动标签，改为固定显式镜像，消除「同一 commit 两次跑结果不同」的迁移噪音。
+
+- 矩阵改为 `ubuntu-24.04` + `windows-2022`（Node 20/22；Node 24 仍只在 Ubuntu 上前瞻）。
+- 为什么不用 `windows-2025`：它内部仍在滚动 VS 版本，预装工具变动更频繁；`windows-2022` 绑定 VS2022，对零依赖 Node CLI 更稳。
+- 关键澄清（豆包提醒）：**固定标签 ≠ 固定镜像快照**。GitHub 仍会在同一标签内滚动更新预装工具，pin 只能挡住「跨 OS 大版本迁移」，挡不住镜像内的小幅 drift。
+- 升级节奏写进 workflow 注释：① 关注 `actions/runner-images` 的 deprecation/brownout 公告；② 需要新预装工具或安全修复时，在独立 PR 里把标签换成候选版本、跑绿再合并，而不是等 EOL 救火。
+- 新增 3 项自测：矩阵必须是固定标签、不得出现 `*-latest`、workflow 注释必须写清 pin 原因与升级节奏。
 
 ## v1.14 更新摘要
 
@@ -23,7 +33,7 @@
 - **diff 不再被换行差异污染**：`splitLines` 走同一套归一化，同一份提示词用 CRLF 保存或用 LF 保存，得到**完全相同**的 hunk；旧实现只是替换 CRLF，BOM 仍会变成第一个字符差。
 - **真实 bug**：`pcause snapshot <id> --file <path>` 的「文件存在性守卫」在某次行级脚本改写中被整行误删，导致文件明明存在也永远报 `PCAUSE_NOT_FOUND`。已修复，并加两条回归测试（存在的文件能读、文件确实不存在时仍正确报错）。
 - **路径形态**：测试覆盖 `PCAUSE_HOME` 与提示词文件位于「带空格 + 中文」的目录下的完整链路（init → snapshot → list），以及中文路径工作区的快照读取。
-- 自测 **197/197**（新增 12 项：BOM 剥离、换行归一、组合归一、CRLF+BOM 读文件、BOM JSON、CRLF+BOM `.jsonl` 探针、CRLF 不产生幽灵 hunk、中文空格路径 init、snapshot --file 回归、落盘归一化、中文路径 list、缺文件报错回归；v1.14 起为 202/202）。
+- 自测 **197/197**（新增 12 项：BOM 剥离、换行归一、组合归一、CRLF+BOM 读文件、BOM JSON、CRLF+BOM `.jsonl` 探针、CRLF 不产生幽灵 hunk、中文空格路径 init、snapshot --file 回归、落盘归一化、中文路径 list、缺文件报错回归；v1.14 起为 205/205）。
 
 ## v1.12 更新摘要
 
@@ -224,7 +234,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 202/202 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 205/205 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
