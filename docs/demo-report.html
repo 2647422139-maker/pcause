@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提示词归因报告 · attr-20261106170034-d13c</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --fg:#e6e8ee; --muted:#98a0b3;
+    --line:#2a2f3a; --accent:#7aa2ff; --good:#3ecf8e; --warn:#f0b429; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:40px 24px; background:var(--bg); color:var(--fg);
+    font:15px/1.6 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .2px; }
+  .sub { color: var(--muted); margin-bottom: 28px; }
+  .meta { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap:12px; margin-bottom:26px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card.warn { border-color: rgba(240,180,41,.5); color: var(--warn); }
+  .card .k { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+  .card .v { font-size:17px; margin-top:4px; word-break:break-all; }
+  table { width:100%; border-collapse: collapse; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  tr:last-child td { border-bottom:none; }
+  code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size:12.5px; }
+  .mono { display:inline-block; max-width: 420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
+  .muted { color: var(--muted); }
+  .tag { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+  .tag.decisive { background: rgba(255,107,107,.15); color: var(--bad); }
+  .tag.partial { background: rgba(240,180,41,.15); color: var(--warn); }
+  .tag.inert { background: rgba(62,207,142,.14); color: var(--good); }
+  .bar { display:inline-block; width:80px; height:8px; background:var(--line); border-radius:4px; margin-right:8px; vertical-align:middle; overflow:hidden; }
+  .bar span { display:block; height:100%; background:var(--accent); }
+  section { margin-top:34px; }
+  h2 { font-size:17px; margin: 0 0 14px; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px; }
+  summary { cursor:pointer; font-weight:600; }
+  .diff { margin:12px 0; padding:10px 12px; background:#0b0d11; border-radius:8px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; }
+  .diff .add { color: var(--good); }
+  .diff .del { color: var(--bad); }
+  .pair { border-top:1px dashed var(--line); padding-top:10px; margin-top:10px; }
+  .probe { color:var(--muted); font-size:13px; margin-bottom:6px; }
+  .yes { color: var(--bad); font-weight:600; }
+  .no { color: var(--good); font-weight:600; }
+  .io { background:#0b0d11; border-radius:8px; padding:10px 12px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; white-space:pre-wrap; }
+  .foot { color:var(--muted); font-size:12px; margin-top:40px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>提示词归因报告</h1>
+  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106170034-d13c · 2026-11-06 17:00:34</div>
+  <div class="meta">
+    <div class="card"><div class="k">新版本 / 对照</div><div class="v">triage-v2 ← triage-v1</div></div>
+    <div class="card"><div class="k">生成模型</div><div class="v">deepseek / deepseek-flash</div></div>
+    <div class="card"><div class="k">判定器</div><div class="v">deepseek + doubao</div></div>
+    <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">3 / 2 / 3</div></div>
+    <div class="card"><div class="k">噪声地板</div><div class="v">0%</div></div>
+    <div class="card"><div class="k">调用 / 耗时</div><div class="v">24 次 · 52.5s</div></div>
+  </div>
+  
+  <section>
+    <h2>结论排行</h2>
+    <table>
+      <thead><tr><th>改动块</th><th>内容</th><th>类型</th><th>影响探针</th><th>校正后影响</th><th>原始</th><th>判定</th><th>第二意见</th></tr></thead>
+      <tbody><tr>
+      <td><code>h2</code></td>
+      <td class="mono">+ 最终只输出一个 JSON 对象：{"category": "&lt;类别名&gt;"}，不要输出其他内容。</td>
+      <td>added</td>
+      <td>3/3</td>
+      <td><div class="bar"><span style="width:100%"></span></div>100%</td>
+      <td class="muted">100%</td>
+      <td><span class="tag decisive">决定性</span></td>
+      <td>12/12</td>
+    </tr>
+<tr>
+      <td><code>h1</code></td>
+      <td class="mono">+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。</td>
+      <td>added</td>
+      <td>1/3</td>
+      <td><div class="bar"><span style="width:33%"></span></div>33%</td>
+      <td class="muted">33%</td>
+      <td><span class="tag partial">部分影响</span></td>
+      <td>12/12</td>
+    </tr>
+<tr>
+      <td><code>h3</code></td>
+      <td class="mono">+ 注意：本分类器是内部工具，输出会进入数据看板。</td>
+      <td>added</td>
+      <td>0/3</td>
+      <td><div class="bar"><span style="width:0%"></span></div>0%</td>
+      <td class="muted">0%</td>
+      <td><span class="tag inert">无影响</span></td>
+      <td>—</td>
+    </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2>建议</h2>
+    <div class="card" style="white-space:pre-wrap">- 保留并重点维护：h1（部分影响，校正后影响 33%）、h2（决定性，校正后影响 100%）
+- 可安全删除（校正后无可测影响）：h3</div>
+  </section>
+  <section>
+    <h2>逐块证据</h2>
+    <details open>
+        <summary><code>h2</code> · 决定性 · 校正后影响 100%（原始 100%）</summary>
+        <div class="diff"><div class="add">+ 最终只输出一个 JSON 对象：{"category": "&lt;类别名&gt;"}，不要输出其他内容。</div></div>
+        <div class="pair">
+            <div class="probe">探针 <code>p1</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：A 输出 JSON 对象，B 输出纯文本，格式不同。</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "REFUND-URGENT"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h2 后</b>
+REFUND-URGENT</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p2</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：A 输出 JSON 对象，B 输出纯文本，格式不同。</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "TECH"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h2 后</b>
+TECH</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p3</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：A 输出 JSON 对象，B 输出纯文本，格式不同。</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "OTHER"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h2 后</b>
+OTHER</div>
+          </div>
+      </details>
+<details open>
+        <summary><code>h1</code> · 部分影响 · 校正后影响 33%（原始 33%）</summary>
+        <div class="diff"><div class="add">+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。</div></div>
+        <div class="pair">
+            <div class="probe">探针 <code>p1</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：A 输出 REFUND-URGENT，B 输出 REFUND，分类标签不同，核心内容有差异。</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "REFUND-URGENT"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
+{"category": "REFUND"}</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p2</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：两者输出完全相同，均为 TECH。</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "TECH"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
+{"category": "TECH"}</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p3</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "OTHER"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
+{"category": "OTHER"}</div>
+          </div>
+      </details>
+<details >
+        <summary><code>h3</code> · 无影响 · 校正后影响 0%（原始 0%）</summary>
+        <div class="diff"><div class="add">+ 注意：本分类器是内部工具，输出会进入数据看板。</div></div>
+        <div class="pair">
+            <div class="probe">探针 <code>p1</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "REFUND-URGENT"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h3 后</b>
+{"category": "REFUND-URGENT"}</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p2</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "TECH"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h3 后</b>
+{"category": "TECH"}</div>
+          </div><div class="pair">
+            <div class="probe">探针 <code>p3</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="io"><b>新提示词输出</b>
+{"category": "OTHER"}</div>
+            <div class="io" style="margin-top:6px"><b>回退 h3 后</b>
+{"category": "OTHER"}</div>
+          </div>
+      </details>
+  </section>
+  <div class="foot">由 pcause 生成 · 反事实消融 + 噪声校正 + 异构模型判定 · 判定器可能出错，决定性结论建议人工复核</div>
+</main>
+</body>
+</html>

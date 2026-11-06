@@ -58,7 +58,7 @@ git clone <this-repo> && cd pcause
 node test/selftest.mjs     # 28/28 项离线自测，不联网、不花钱
 ```
 
-生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经 [doubao-bridge](https://github.com/) 技能，无需任何 API Key）。
+生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经本机 `doubao-bridge` 技能，无需任何 API Key）。
 
 跑演示（3 个探针 × 3 个改动块，约 1 分钟）：
 
@@ -83,7 +83,7 @@ npm run demo
   □  h3  无影响      0%（原始   0%）  + 注意：本分类器是内部工具，输出会进入数据看板
 ```
 
-结论一目了然：把输出改成 JSON 的那条（h2）是决定性的；情绪加急规则（h1）只对 1/3 的工单生效；「内部工具、不对外公开」这句对行为毫无影响，可以删。报告在 `.pcause/attributions/attr-*.md` 与 `.html`（HTML 可直接双击打开）。
+结论一目了然：把输出改成 JSON 的那条（h2）是决定性的；情绪加急规则（h1）只对 1/3 的工单生效；「内部工具、不对外公开」这句对行为毫无影响，可以删。报告在 `.pcause/attributions/attr-*.md` 与 `.html`（HTML 可直接双击打开）；仓库里的 **[docs/demo-report.html](docs/demo-report.html)** 就是这次运行的报告副本。
 
 ## 4. 命令
 
