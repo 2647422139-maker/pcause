@@ -2,6 +2,19 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.18.0] - 2026-11-07
+
+### Changed
+
+- **README 首页信息架构重整**：此前 18 个版本的「更新摘要」堆在正文之前，真正的「它解决什么问题 / 快速开始」被推到 200 行之后。现在历史摘要整体迁入 `docs/updates.md`，README 只留一行指向归档与 CHANGELOG。
+- 新增「60 秒体验」区块（置顶、位于正文之前）：一句话定位、唯一前提（Node ≥ 20）、可复制的 `git clone` + `node src/cli.mjs demo` 入口、真实输出缩略（明确标注「示意」），并说明**本包尚未发布到 npm**，避免用户直接 `npx` 失败。
+- 修正重复的章节编号：v1.12 的「npm 发布演练」保持 `4.4`，v1.17 的「发布到 npm」改为 `4.5`。
+- 新增 `docs/quickstart.md`：60 秒体验 + 用自己提示词的命令骨架 + 常见报错排查表（Node 版本、npx 404/缓存、clone 失败、空输出、采样不足）。
+
+### Added
+
+- 新增 9 项自测：60 秒区块位置与内容、npm 未发布说明、输出「示意」标注、历史摘要归档完整性、README 不再堆叠摘要、归档链接、quickstart 内容，总自测 230 项。
+
 ## [0.17.0] - 2026-11-07
 
 ### Added

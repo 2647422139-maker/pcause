@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.17.0', '版本号升到 0.17.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.18.0', '版本号升到 0.18.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.17.0'), 'CLI 版本号与 package.json 同步（0.17.0）');
+check(String(cliVersion.stdout).includes('0.18.0'), 'CLI 版本号与 package.json 同步（0.18.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -683,8 +683,9 @@ check(ciText.includes('package-manager-cache: false'), 'setup-node v5 显式关�
 check(ciText.includes('os: [ubuntu-24.04, windows-2022]'), '矩阵使用固定镜像标签 ubuntu-24.04 / windows-2022（避免 latest 跨大版本迁移抖动）');
 check(!/os: \[[^\]]*latest/.test(ciText), '矩阵不再使用 *-latest 浮动标签');
 check(ciText.includes('固定 label 不等于') || ciText.includes('升级节奏'), 'workflow 注释写清 pin 原因与升级节奏');
-check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && readmeCi.includes('v1.11 更新摘要'), 'README 展示 CI badge 并记录 v1.11');
-check(readmeCi.includes('v1.14 更新摘要'), 'README 记录 v1.14（Actions v5 升级）');
+const updatesArchive = fs.readFileSync(path.join(PKG_ROOT, 'docs', 'updates.md'), 'utf8');
+check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && updatesArchive.includes('v1.11 更新摘要'), 'README 展示 CI badge，历史摘要归档记录 v1.11');
+check(updatesArchive.includes('v1.14 更新摘要'), '历史摘要归档记录 v1.14（Actions v5 升级）');
 
 console.log('\n[22/22] v1.12：npm 发布演练（scripts/pack-check.mjs）');
 const pc = await import('../scripts/pack-check.mjs');
@@ -785,6 +786,25 @@ try {
 } catch {}
 check(releaseJson && Array.isArray(releaseJson.manualSteps) && releaseJson.checks.length >= 6, 'CLI --json 输出可解析且含 checks/manualSteps');
 check(Boolean(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).scripts['release:check']), 'package.json 暴露 npm run release:check');
+
+console.log('\n[27/27] v1.18：README 首页「60 秒体验」与文档归档');
+const readme18 = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+const qi = readme18.indexOf('## 60 秒体验');
+const sec1 = readme18.indexOf('## 1. 它解决什么问题');
+check(qi > 0 && qi < sec1, 'README 首页含「60 秒体验」区块且位于正文（§1）之前');
+const quickBlock = qi >= 0 ? readme18.slice(qi, sec1) : '';
+check(quickBlock.includes('node src/cli.mjs demo'), '60 秒区块给出可直接复制的运行入口');
+check(quickBlock.includes('示意'), '60 秒区块的样例输出标注为「示意」，避免与真实输出不一致误导');
+check(quickBlock.includes('尚未发布到 npm') || quickBlock.includes('未发布到 npm'), '明确说明 npm 未发布，避免用户直接 npx 失败');
+const updatesPath = path.join(PKG_ROOT, 'docs', 'updates.md');
+check(fs.existsSync(updatesPath), '历史更新摘要归档到 docs/updates.md');
+const updatesText = fs.existsSync(updatesPath) ? fs.readFileSync(updatesPath, 'utf8') : '';
+check(updatesText.includes('## v1.17 更新摘要') && updatesText.includes('## v1.10 更新摘要'), '归档文件含完整历史更新摘要');
+check((readme18.match(/^## v1\.\d+ 更新摘要/gm) || []).length === 0, 'README 首屏不再堆叠历史更新摘要（已迁移）');
+check(readme18.includes('[docs/updates.md](docs/updates.md)'), 'README 保留指向归档的链接');
+const quickPath = path.join(PKG_ROOT, 'docs', 'quickstart.md');
+const quickText = fs.existsSync(quickPath) ? fs.readFileSync(quickPath, 'utf8') : '';
+check(quickText.includes('git clone') && quickText.includes('尚未发布到 npm') && quickText.includes('常见问题'), 'docs/quickstart.md 含入口、npm 未发布说明与常见问题');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
