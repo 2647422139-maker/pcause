@@ -62,7 +62,7 @@ export function planCalls(opts, hunks, probes) {
     plannedCalls,
     maxCalls,
     fitsBudget: plannedCalls <= maxCalls,
-    note: 'verify 调用按「所有改动块都非无影响」取上限；实际可能更少。',
+    note: '预估按「无缓存」计算，实际运行时命中缓存会更少；verify 调用按「所有改动块都非无影响」取上限。',
   };
 }
 

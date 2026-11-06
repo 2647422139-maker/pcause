@@ -149,6 +149,7 @@ async function cmdAttribute(flags) {
     if (!plan.plan.fitsBudget) {
       tick('  ⚠ 预估调用数超过预算：正式运行会在预算耗尽处提前结束，并把未测完的改动块标记为「采样不足」');
     }
+    tick(`  说明：${plan.plan.note}`);
     tick('');
     for (const h of plan.hunks) tick(`  ${h.id}  ${h.summary}`);
     return 0;
