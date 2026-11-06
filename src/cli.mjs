@@ -16,7 +16,7 @@ import { compareAttributions, buildCompareMarkdown } from './compare.mjs';
 import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
 import { PcauseError, usage, notInitialized, formatError } from './errors.mjs';
 import { readTextFile } from './encoding.mjs';
-import { collectDoctorInfo, formatDoctorText } from './doctor.mjs';
+import { collectDoctorInfo, formatDoctorText, formatIssueReport } from './doctor.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(HERE, '..');
@@ -37,7 +37,8 @@ const HELP = `pcause —— 提示词因果归因器
                                                  对比两次归因的结论迁移（签名不一致时拒绝，避免误读）
   pcause schema [--out file]                     导出机器可读结果的 JSON Schema
   pcause demo [--json]                           内置演示：mock 生成 + 离线判定，不联网、不需要 Key，产物写到系统临时目录
-  pcause doctor [--json]                         自检：版本/Node/平台/工作区/配置/通道可用性（不显示密钥，报 issue 前先跑）
+  pcause doctor [--json|--issue]                 自检：版本/Node/平台/工作区/配置/通道可用性（不显示密钥，报 issue 前先跑）
+                                                 --issue 输出可直接粘贴的 issue Markdown
   pcause selftest                                离线自测
   pcause version                                 打印版本号
 
@@ -441,7 +442,9 @@ function cmdSchema(flags) {
 
 function cmdDoctor(flags) {
   const info = collectDoctorInfo({ cwd: process.cwd() });
-  if (flags.json === true) {
+  if (flags.issue === true) {
+    console.log(formatIssueReport(info, { cwd: process.cwd() }));
+  } else if (flags.json === true) {
     console.log(JSON.stringify(info));
   } else {
     console.log(formatDoctorText(info));

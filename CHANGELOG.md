@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.22.0] - 2026-11-07
+
+### Added
+
+- `pcause doctor --issue`：输出一段可直接粘进 GitHub issue 的 Markdown——按 bug 模板的四段结构（我做了什么 / 期望 / 实际报错 / 自检输出）排好，自检输出用代码块包裹，**不含密钥**。
+- `src/doctor.mjs` 新增 `formatIssueReport(info)`；bug 模板改为推荐 `doctor --issue` 生成报告。
+- 新增 8 项自测（命令可用、四段结构、代码块、不泄露密钥、无 undefined/null 泄漏、模板联动、CLI 接线、模块导出），总自测 266 项。
+
 ## [0.21.0] - 2026-11-07
 
 ### Added

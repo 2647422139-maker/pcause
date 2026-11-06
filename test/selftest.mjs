@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.21.0', '版本号升到 0.21.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.22.0', '版本号升到 0.22.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.21.0'), 'CLI 版本号与 package.json 同步（0.21.0）');
+check(String(cliVersion.stdout).includes('0.22.0'), 'CLI 版本号与 package.json 同步（0.22.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.21.0', '任意 cwd 下 version 不依赖工作目录（0.21.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.22.0', '任意 cwd 下 version 不依赖工作目录（0.22.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -892,6 +892,21 @@ check(pd.includes('ESM / CJS'), '插件文档列出 ESM/CJS 常见坑');
 check(pd.includes('stderr'), '插件文档提醒调试日志不要污染 stdout');
 const readmePlugins = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
 check(readmePlugins.includes('docs/plugins.md'), 'README 链接到插件开发指南');
+
+// ===== [31/31] v1.22 一键生成 issue 报告（doctor --issue） =====
+const issueRun = runAt(tmpRoot, ['doctor', '--issue']);
+const issueOut = issueRun.stdout || '';
+check(issueRun.status === 0 && issueOut.includes('## 环境自检'), 'doctor --issue 退出码 0 且含自检标题');
+check(issueOut.includes('### 1. 我做了什么') && issueOut.includes('### 2. 期望发生什么') && issueOut.includes('### 3. 实际发生了什么') && issueOut.includes('### 4. 自检输出'), '生成报告包含 issue 模板要求的四段结构');
+check((issueOut.match(/\x60\x60\x60/g) || []).length >= 3, '报告用代码块包裹命令/报错/自检输出');
+check(!/sk-[A-Za-z0-9]{8,}/.test(issueOut) && !issueOut.includes('sk-f0cf'), '报告不泄露密钥形态内容');
+check(!issueOut.includes('undefined') && !issueOut.includes('null'), '报告无 undefined/null 占位泄漏');
+const bugTplNow = fs.readFileSync(path.join(PKG_ROOT, '.github', 'ISSUE_TEMPLATE', 'bug_report.yml'), 'utf8');
+check(bugTplNow.includes('doctor --issue'), 'bug 模板推荐用 doctor --issue 生成报告');
+const cliSrcIssue = fs.readFileSync(path.join(PKG_ROOT, 'src', 'cli.mjs'), 'utf8');
+check(cliSrcIssue.includes('flags.issue === true') && cliSrcIssue.includes('formatIssueReport'), 'CLI 里 doctor --issue 分支已接线');
+const docIssueSrc = fs.readFileSync(path.join(PKG_ROOT, 'src', 'doctor.mjs'), 'utf8');
+check(docIssueSrc.includes('export function formatIssueReport'), 'doctor.mjs 导出 formatIssueReport');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

@@ -9,7 +9,7 @@ body:
         **提交前请先完成两件事：**
 
         1. 在仓库根目录运行自检并把输出粘贴到下面的「自检输出」：
-           `node src/cli.mjs doctor`（发布后也可用 `npx pcause doctor`）
+           `node src/cli.mjs doctor --issue`（发布后也可用 `npx pcause doctor --issue`）——它会生成一段可直接粘贴的 Markdown，已按本模板的四段结构排好，不含密钥
         2. 删除所有密钥（API Key / token / 私密提示词）。**不要用截图代替文本**，报错文本才能被搜索。
 
         > 只想体验功能请先跑 `node src/cli.mjs demo`；安装与常见报错见 [快速开始](https://github.com/2647422139-maker/pcause/blob/main/docs/quickstart.md)。
@@ -19,7 +19,7 @@ body:
     attributes:
       label: 自检输出（`pcause doctor`）
       description: 直接粘贴完整输出；它不含密钥，只含版本/平台/工作区/通道可用性。
-      placeholder: 把 `node src/cli.mjs doctor` 的输出整段粘过来
+      placeholder: 把 `node src/cli.mjs doctor --issue` 的输出整段粘过来
       render: text
     validations:
       required: true

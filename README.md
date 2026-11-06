@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-258%2F258%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-266%2F266%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -85,7 +85,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 258/258 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 266/266 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -176,7 +176,7 @@ echo $?   # 0 无命中；2 命中门禁；1 运行错误
 
 排错开关：`PCAUSE_DEBUG=1` 追加堆栈；`PCAUSE_CONFIG` 指定插件配置；`PCAUSE_HOME` 指定工作区。门禁命中（`--fail-on`，退出码 2）属于业务阻断，不进入错误码体系。
 
-报 issue 前先跑 `pcause doctor`（v1.19）：它会输出 pcause/Node/平台/工作区/插件配置/通道可用性（**不显示任何密钥**），把整段贴进 issue 即可，能省掉环境追问。`--json` 输出机器可读版本。
+报 issue 前先跑 `pcause doctor --issue`（v1.22）：它会直接生成一段可粘贴的 Markdown（四段结构 + 自检输出，不含密钥）；只想要纯文本自检用 `pcause doctor`。它会输出 pcause/Node/平台/工作区/插件配置/通道可用性（**不显示任何密钥**），把整段贴进 issue 即可，能省掉环境追问。`--json` 输出机器可读版本。
 
 ## 4.2 发布前自检（v1.10）
 

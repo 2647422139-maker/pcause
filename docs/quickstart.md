@@ -57,6 +57,6 @@ node src/cli.mjs snapshot my-prompt --file "C:\我的 提示词\v1.md"
 
 超过 260 字符的长路径也已纳入回归测试（Windows 10+ / Node 20+ 可正常读写）。
 
-报 bug 前先跑自检：`node src/cli.mjs doctor`（发布后 `npx pcause doctor`）——它会输出 pcause/Node/平台/工作区/通道可用性，**不含密钥**，把整段贴进 issue 即可。
+报 bug 前先跑：`node src/cli.mjs doctor --issue`（发布后 `npx pcause doctor --issue`）——它会直接生成一段可粘贴进 issue 的 Markdown（四段结构 + 自检输出，不含密钥）；只看自检用 `node src/cli.mjs doctor`——它会输出 pcause/Node/平台/工作区/通道可用性，**不含密钥**，把整段贴进 issue 即可。
 
 找不到答案时：`node src/cli.mjs help`、README 的 [错误码自查表](../README.md#41-出错时怎么办错误码与自助排查v19)，或提 issue 并附上 `node src/cli.mjs version` 与报错原文。

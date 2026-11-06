@@ -138,3 +138,37 @@ export function formatDoctorText(info, { cwd = process.cwd() } = {}) {
   lines.push('提交 issue 前请确认：已删除密钥 / 已附上完整命令与报错文本（优先文本，不要截图）');
   return lines.join('\n');
 }
+
+// 生成可直接贴进 GitHub issue 的 Markdown（issue 模板要求的四段结构 + 自检输出代码块）。
+// 关键约定：只包含 doctor 已确认「不含密钥」的信息；调用方负责保证 info 来自 collectDoctorInfo。
+export function formatIssueReport(info, { cwd = process.cwd() } = {}) {
+  const fence = String.fromCharCode(96).repeat(3);
+  const lines = [];
+  lines.push('## 环境自检（pcause doctor --issue）');
+  lines.push('');
+  lines.push('<!-- 直接粘贴本段；贴之前请删除不想公开的路径或用户名 -->');
+  lines.push('');
+  lines.push('### 1. 我做了什么（命令 + 关键参数）');
+  lines.push(''); 
+  lines.push(fence + 'bash');
+  lines.push('node src/cli.mjs <命令> <参数>');
+  lines.push(fence);
+  lines.push('');
+  lines.push('### 2. 期望发生什么');
+  lines.push('');
+  lines.push('（一句话）');
+  lines.push('');
+  lines.push('### 3. 实际发生了什么（报错原文，不要用截图）');
+  lines.push('');
+  lines.push(fence + 'text');
+  lines.push('✖ [PCAUSE_XXX] ...');
+  lines.push(fence);
+  lines.push('');
+  lines.push('### 4. 自检输出');
+  lines.push('');
+  lines.push(fence + 'text');
+  lines.push(formatDoctorText(info, { cwd }));
+  lines.push(fence);
+  lines.push('');
+  return lines.join('\n');
+}
