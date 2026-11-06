@@ -2,6 +2,18 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.19.0] - 2026-11-07
+
+### Added
+
+- 新增 `pcause doctor [--json]`：离线自检，输出 pcause 版本、Node、平台、工作区状态（是否初始化、快照与归因数）、插件配置、DeepSeek 凭据来源（**不显示内容**）、豆包桥接可用性、git 状态，并给出下一步建议。用于报 issue 前收集环境信息。
+- 新增 GitHub issue 模板（`.github/ISSUE_TEMPLATE/`）：`bug_report.yml`（doctor 输出必填、命令/报错/期望/实际必填、禁截图与密钥、问题分类）、`feature_request.yml`（动机/场景/方案/备选）、`config.yml`（快速开始、demo 报告、零 Key 演示入口）。
+- 新增 11 项自测（doctor 文本与 JSON、密钥不落屏、未初始化提示、issue 模板结构/必填/无 tab、help 登记），总自测 241 项。
+
+### Fixed
+
+- `isInitialized()` 此前只判断工作区根目录是否存在，用户随手创建一个空目录（或用 `PCAUSE_HOME` 指向空目录）就会被误判为已初始化；现在以 `prompts/` 与 `attributions/` 是否存在为标志，`initStore()` 也会把残缺目录补齐。
+
 ## [0.18.0] - 2026-11-07
 
 ### Changed

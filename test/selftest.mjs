@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.18.0', '版本号升到 0.18.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.19.0', '版本号升到 0.19.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.18.0'), 'CLI 版本号与 package.json 同步（0.18.0）');
+check(String(cliVersion.stdout).includes('0.19.0'), 'CLI 版本号与 package.json 同步（0.19.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -805,6 +805,42 @@ check(readme18.includes('[docs/updates.md](docs/updates.md)'), 'README 保留指
 const quickPath = path.join(PKG_ROOT, 'docs', 'quickstart.md');
 const quickText = fs.existsSync(quickPath) ? fs.readFileSync(quickPath, 'utf8') : '';
 check(quickText.includes('git clone') && quickText.includes('尚未发布到 npm') && quickText.includes('常见问题'), 'docs/quickstart.md 含入口、npm 未发布说明与常见问题');
+
+console.log('\n[28/28] v1.19：`pcause doctor` 自检 + GitHub issue 模板');
+const doc = await import('../src/doctor.mjs');
+const dinfo = doc.collectDoctorInfo({ cwd: PKG_ROOT });
+const dtext = doc.formatDoctorText(dinfo);
+check(dtext.includes('pcause 自检') && dtext.includes(dinfo.version) && dtext.includes(process.version), 'doctor 文本含版本、Node 与平台信息');
+check(dtext.includes('不含密钥') && !/sk-[A-Za-z0-9]{8,}/.test(dtext), 'doctor 文本声明不含密钥且未泄露形如 sk- 的密钥');
+const djson = JSON.parse(JSON.stringify(dinfo));
+check(Array.isArray(djson.rows) && djson.rows.length >= 6 && djson.rows.some((r) => r.label === '平台'), 'doctor --json 结构可序列化且含平台等条目');
+const withKey = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'doctor'], {
+  encoding: 'utf8',
+  env: { ...process.env, DEEPSEEK_API_KEY: 'sk-should-never-be-printed-123456' },
+});
+check(!String(withKey.stdout).includes('sk-should-never-be-printed-123456') && String(withKey.stdout).includes('不显示内容'), 'doctor 不打印密钥内容（只显示是否设置）');
+const emptyHome = path.join(tmpRoot, 'empty-home');
+fs.mkdirSync(emptyHome, { recursive: true });
+const uninit = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'doctor', '--json'], {
+  encoding: 'utf8',
+  env: { ...process.env, PCAUSE_HOME: emptyHome, DEEPSEEK_API_KEY: '' },
+});
+let uninitJson = null;
+try {
+  uninitJson = JSON.parse(String(uninit.stdout).trim());
+} catch {}
+check(uninit.status === 0 && uninitJson && uninitJson.warnings.some((w) => w.includes('pcause init') || w.includes('pcause demo')), '未初始化工作区时 doctor 给出可执行下一步且退出码 0');
+const tplDir = path.join(PKG_ROOT, '.github', 'ISSUE_TEMPLATE');
+const bugTpl = fs.existsSync(path.join(tplDir, 'bug_report.yml')) ? fs.readFileSync(path.join(tplDir, 'bug_report.yml'), 'utf8') : '';
+check(bugTpl.includes('name:') && bugTpl.includes('body:') && bugTpl.includes('node src/cli.mjs doctor') && !bugTpl.includes('\t'), 'bug_report.yml 结构完整、含 doctor 指引、未使用 tab 缩进');
+check(bugTpl.includes('不要用截图') || bugTpl.includes('不要截图'), 'bug 模板明确要求文本报错而非截图');
+check((bugTpl.match(/required: true/g) || []).length >= 5, 'bug 模板只对定位必需信息设必填（版本/命令/报错/期望/实际等）');
+const featTpl = fs.existsSync(path.join(tplDir, 'feature_request.yml')) ? fs.readFileSync(path.join(tplDir, 'feature_request.yml'), 'utf8') : '';
+check(featTpl.includes('motivation') && featTpl.includes('proposal'), 'feature_request.yml 含动机与方案两个核心字段');
+const cfgTpl = fs.existsSync(path.join(tplDir, 'config.yml')) ? fs.readFileSync(path.join(tplDir, 'config.yml'), 'utf8') : '';
+check(cfgTpl.includes('blank_issues_enabled') && cfgTpl.includes('docs/quickstart.md'), 'config.yml 配置了空白 issue 与 quickstart 联系入口');
+const helpText = fs.readFileSync(path.join(PKG_ROOT, 'src', 'cli.mjs'), 'utf8');
+check(helpText.includes('pcause doctor'), 'CLI help 中登记了 doctor 命令');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

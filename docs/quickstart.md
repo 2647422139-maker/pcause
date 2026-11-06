@@ -47,4 +47,6 @@ node src/cli.mjs attribute --old v1 --new v2 --probes probes.jsonl \
 | 真实归因报 `PCAUSE_EMPTY_OUTPUT` | 模型把预算耗在思考内容上；加大 `--max-calls`/降低 `--samples`，或换非思考模型 |
 | 报告里某块「采样不足」 | 预算被提前耗尽：提高 `--max-calls`，或减少探针/采样数；「采样不足」不等于「无影响」 |
 
+报 bug 前先跑自检：`node src/cli.mjs doctor`（发布后 `npx pcause doctor`）——它会输出 pcause/Node/平台/工作区/通道可用性，**不含密钥**，把整段贴进 issue 即可。
+
 找不到答案时：`node src/cli.mjs help`、README 的 [错误码自查表](../README.md#41-出错时怎么办错误码与自助排查v19)，或提 issue 并附上 `node src/cli.mjs version` 与报错原文。

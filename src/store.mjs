@@ -26,12 +26,15 @@ export function paths() {
 }
 
 export function isInitialized() {
-  return fs.existsSync(paths().root);
+  // 只看目录存在会把「用户随手建了一个空 PCAUSE_HOME」误判为已初始化；
+  // 以 initStore 一定会创建的 prompts/ 与 attributions/ 为标志。
+  const p = paths();
+  return fs.existsSync(p.prompts) && fs.existsSync(p.attributions);
 }
 
 export function initStore({ force = false } = {}) {
   const p = paths();
-  if (fs.existsSync(p.root) && !force) return { created: false, root: p.root };
+  if (isInitialized() && !force) return { created: false, root: p.root };
   for (const dir of [p.root, p.prompts, p.runs, p.attributions, p.cache]) {
     fs.mkdirSync(dir, { recursive: true });
   }

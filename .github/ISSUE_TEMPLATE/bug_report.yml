@@ -1,0 +1,106 @@
+name: 🐛 Bug 报告
+description: 程序报错、崩溃、结果明显不对——请先跑 `pcause doctor` 再填
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **提交前请先完成两件事：**
+
+        1. 在仓库根目录运行自检并把输出粘贴到下面的「自检输出」：
+           `node src/cli.mjs doctor`（发布后也可用 `npx pcause doctor`）
+        2. 删除所有密钥（API Key / token / 私密提示词）。**不要用截图代替文本**，报错文本才能被搜索。
+
+        > 只想体验功能请先跑 `node src/cli.mjs demo`；安装与常见报错见 [快速开始](https://github.com/2647422139-maker/pcause/blob/main/docs/quickstart.md)。
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: 自检输出（`pcause doctor`）
+      description: 直接粘贴完整输出；它不含密钥，只含版本/平台/工作区/通道可用性。
+      placeholder: 把 `node src/cli.mjs doctor` 的输出整段粘过来
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: 执行的完整命令
+      description: 从仓库根目录开始的完整命令；如果含密钥请先用 `<KEY>` 替换。
+      placeholder: node src/cli.mjs attribute --old v1 --new v2 --probes probes.jsonl --provider deepseek --judge deepseek
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: 完整报错 / 异常行为
+      description: 报错请贴 stderr 全文（含 `✖ [PCAUSE_xxx]` 开头的行）；没有报错就描述你看到的异常现象。
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      placeholder: 你原以为会发生什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      placeholder: 实际发生了什么？如果涉及归因结论异常，贴一下报告里相关 hunk 的结论与证据。
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 问题属于哪类？
+      description: 用于区分「程序问题」和「归因结论不符合预期」，两类排查路径不同。
+      options:
+        - 程序崩溃 / 报错 / 命令行为异常
+        - 归因结论不符合预期（判决定性/无影响与实际不符）
+        - 安装 / 环境 / CI 相关问题
+        - 文档或输出不易理解
+        - 不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: 使用的生成/判定通道
+      options:
+        - mock（离线演示）
+        - deepseek（默认）
+        - doubao（豆包桌面桥接）
+        - 自定义插件（pcause.config.json）
+        - 不涉及模型调用
+        - 不确定
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 提示词 / 探针样本（脱敏）
+      description: 尽量给能触发问题的最小提示词改动与探针；LLM 问题本身不稳定，无法稳定复现请注明概率即可，不必强求。
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已删除输出中的密钥 / token / 私密数据
+          required: true
+        - label: 我已搜索过现有 issue，且这不是安装问题（安装问题见快速开始）
+          required: false

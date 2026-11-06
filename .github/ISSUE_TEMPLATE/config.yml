@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 快速开始与常见报错
+    url: https://github.com/2647422139-maker/pcause/blob/main/docs/quickstart.md
+    about: 安装、Node 版本、npx 404、空输出、采样不足——先看这里，能自己解决大多数使用问题
+  - name: 🧪 零 Key 演示
+    url: https://github.com/2647422139-maker/pcause#60-秒体验零-key零安装零网络
+    about: 想先看它是什么：git clone 后跑 `node src/cli.mjs demo`，不联网、不需要 API Key
+  - name: 📊 演示报告样例
+    url: https://github.com/2647422139-maker/pcause/blob/main/docs/demo-report.html
+    about: 一次真实归因实验产出的 HTML 报告长这样
