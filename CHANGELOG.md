@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.16.0] - 2026-11-07
+
+### Added
+
+- 新增 `pcause demo`：内置演示数据（旧版/新版提示词 + 3 个探针），用 `mock` 生成器 + 启发式判定在本地跑完整归因，不联网、不需要 API Key、不改动当前工作区（产物写到系统临时目录）。
+- `pcause demo --json` 输出机器可读结果（纯 JSON 走 stdout，进度日志走 stderr）。
+- 7 项自测覆盖 demo：无需 init、JSON 不被污染、3 个改动块、2 决定性 + 1 无影响、临时目录产物、报告落盘、人类可读摘要；总自测 212 项。
+
 ## [0.15.0] - 2026-11-07
 
 ### Changed

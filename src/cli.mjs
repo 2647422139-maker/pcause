@@ -2,6 +2,7 @@
 // pcause —— 提示词因果归因器 CLI
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
@@ -34,6 +35,7 @@ const HELP = `pcause —— 提示词因果归因器
   pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]
                                                  对比两次归因的结论迁移（签名不一致时拒绝，避免误读）
   pcause schema [--out file]                     导出机器可读结果的 JSON Schema
+  pcause demo [--json]                           内置演示：mock 生成 + 离线判定，不联网、不需要 Key，产物写到系统临时目录
   pcause selftest                                离线自测
   pcause version                                 打印版本号
 
@@ -441,6 +443,74 @@ function cmdSelftest() {
   return r.status ?? 1;
 }
 
+// 内置演示：不联网、不需要 API Key、不改动当前工作区。
+// 全部写入系统临时目录（PCAUSE_HOME 临时指向它），跑完告诉你产物在哪、下一步怎么用。
+const DEMO_OLD_TEXT = ['你是一名客服回复助手。', '请直接回答问题。', '保持简洁。', '保持客观。'].join('\n') + '\n';
+const DEMO_NEW_TEXT =
+  [
+    '你是一名客服回复助手。',
+    '输出必须使用 Markdown 表格呈现结论。',
+    '请直接回答问题。',
+    '保持简洁。',
+    '语气保持温和友好。',
+    '保持客观。',
+    '注意：内部工具，输出会进入数据看板。',
+  ].join('\n') + '\n';
+const DEMO_PROBES = [
+  { id: 'p1', input: '退款被拒，很生气。' },
+  { id: 'p2', input: '升级后白屏。' },
+  { id: 'p3', input: '收到了，还行。' },
+];
+
+async function cmdDemo(flags) {
+  const silent = Boolean(flags.json);
+  const log = silent ? () => {} : (msg) => console.error('· ' + msg);
+  const stamp = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+  const base = path.join(os.tmpdir(), `pcause-demo-${stamp}`);
+  const prevHome = process.env.PCAUSE_HOME;
+  try {
+    process.env.PCAUSE_HOME = base;
+    initStore({ force: false });
+    savePrompt({ id: 'demo-old', text: DEMO_OLD_TEXT, note: 'demo 旧版提示词' });
+    savePrompt({ id: 'demo-new', text: DEMO_NEW_TEXT, note: 'demo 新版提示词' });
+    const probesFile = path.join(base, 'probes.jsonl');
+    fs.writeFileSync(probesFile, DEMO_PROBES.map((p) => JSON.stringify(p)).join('\n') + '\n', 'utf8');
+    if (!silent) tick(`✔ 已创建临时演示工作区：${base}`);
+    if (!silent) tick('· 运行归因（mock 生成器 + heuristic 判定，不联网、不花钱）');
+    const attr = await attribute(
+      {
+        old: 'demo-old',
+        new: 'demo-new',
+        probes: probesFile,
+        provider: 'mock',
+        judge: 'heuristic',
+        samples: 2,
+        maxCalls: 80,
+        kind: 'prompt',
+        cache: false,
+      },
+      { log }
+    );
+    const files = writeReports(attr, {});
+    const rows = attr.hunks.map((h) => ({ id: h.hunk.id, verdict: h.verdict, label: VERDICT_LABEL[h.verdict], effect: h.effect, summary: h.hunk.summary }));
+    if (silent) {
+      console.log(JSON.stringify({ ok: true, workspace: base, attributionId: attr.id, noiseFloor: attr.noiseFloor, hunks: rows, mdPath: files.mdPath, htmlPath: files.htmlPath }));
+      return 0;
+    }
+    tick(`✔ 归因完成：${attr.id}（${attr.calls ?? '?'} 次生成/判定调用，噪声地板 ${attr.noiseFloor == null ? '未测' : Math.round(attr.noiseFloor * 100) + '%'}）`);
+    for (const r of rows) {
+      tick(`  ${r.verdict === 'decisive' ? '■' : r.verdict === 'inert' ? '□' : '▨'}  ${r.id}  ${r.label} ${r.effect == null ? '' : Math.round(r.effect * 100) + '%'}    ${r.summary}`);
+    }
+    tick(`报告：${files.mdPath}`);
+    tick(`      ${files.htmlPath}`);
+    tick('下一步：pcause demo --json 看机器可读结果；想测自己的提示词，见 README 的「快速开始」');
+    return 0;
+  } finally {
+    if (prevHome === undefined) delete process.env.PCAUSE_HOME;
+    else process.env.PCAUSE_HOME = prevHome;
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0] || 'help';
@@ -469,6 +539,8 @@ async function main() {
       return cmdSchema(flags);
     case 'selftest':
       return cmdSelftest();
+    case 'demo':
+      return cmdDemo(flags);
     case 'version': {
       const pkg = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
       tick(`pcause ${pkg.version}`);

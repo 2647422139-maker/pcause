@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.15.0', '版本号升到 0.15.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.16.0', '版本号升到 0.16.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.15.0'), 'CLI 版本号与 package.json 同步（0.15.0）');
+check(String(cliVersion.stdout).includes('0.16.0'), 'CLI 版本号与 package.json 同步（0.16.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -749,6 +749,21 @@ check(savedText23.length > 0 && !savedText23.includes('\r') && !savedText23.star
 check(String(runRaw(['list'], env23).stdout).includes('crlf-prompt'), '中文路径工作区里的快照可被 list 列出');
 const rMissing23 = runRaw(['snapshot', 'x', '--file', path.join(winDir, '不存在.md')], env23);
 check(rMissing23.status === 1 && String(rMissing23.stderr).includes('PCAUSE_NOT_FOUND'), '文件确实不存在时仍报 PCAUSE_NOT_FOUND（修复没破坏错误路径）');
+
+console.log('\n[25/25] v1.16：内置演示 pcause demo（不联网、不改工作区）');
+const rDemo = runRaw(['demo', '--json'], { ...process.env, PCAUSE_HOME: path.join(tmpRoot, 'demo-外面不存在的工作区') });
+check(rDemo.status === 0, 'pcause demo --json 退出码 0（无需先 init、无需 API Key）');
+let demoOut = null;
+try {
+  demoOut = JSON.parse(String(rDemo.stdout));
+} catch {}
+check(demoOut && demoOut.ok === true, 'demo 输出为纯 JSON（stdout 没有被进度日志污染）');
+check(demoOut && Array.isArray(demoOut.hunks) && demoOut.hunks.length === 3, 'demo 构造 3 个独立改动块');
+check(demoOut && demoOut.hunks.filter((h) => h.verdict === 'decisive').length === 2 && demoOut.hunks.some((h) => h.verdict === 'inert'), 'demo 结论符合预期：2 个决定性 + 1 个无影响');
+check(demoOut && demoOut.workspace.includes('pcause-demo-'), 'demo 把产物写到系统临时目录（不污染当前工作区）');
+check(demoOut && fs.existsSync(demoOut.mdPath) && fs.existsSync(demoOut.htmlPath), 'demo 真的生成 Markdown 与 HTML 报告文件');
+const rDemoText = runRaw(['demo'], { ...process.env, PCAUSE_HOME: path.join(tmpRoot, 'demo-外面不存在的工作区2') });
+check(rDemoText.status === 0 && String(rDemoText.stdout).includes('归因完成') && String(rDemoText.stdout).includes('不联网'), '不带 --json 时 demo 打印人类可读摘要与下一步提示');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
