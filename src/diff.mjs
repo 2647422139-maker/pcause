@@ -1,9 +1,11 @@
 // 行级 diff：把"旧提示词 → 新提示词"拆成若干 hunk（连续变更块）
 import { PcauseError } from './errors.mjs';
+import { normalizeText } from './encoding.mjs';
 // 每个 hunk 都是可独立回退的最小实验单元。
 
 export function splitLines(text) {
-  return String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  // 读入归一化：BOM 与 CRLF / 孤立 CR 都不该变成「额外的行」或幽灵 hunk
+  return normalizeText(text).split('\n');
 }
 
 // LCS 动态规划，返回编辑操作序列（equal / del / ins）

@@ -2,6 +2,22 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.13.0] - 2026-11-07
+
+### Added
+
+- 文本读入归一化模块 `src/encoding.mjs`：`stripBom` / `normalizeNewlines` / `normalizeText` / `readTextFile`。提示词文件、探针 `.jsonl`、插件配置 `pcause.config.json` 统一在读取后、业务逻辑前剥离 UTF-8 BOM 并把 CRLF / 孤立 CR 归一为 LF。
+- 跨平台兼容测试（12 项）：BOM / CRLF / 组合归一、CRLF+BOM 的 `.jsonl` 探针、CRLF 输入不产生幽灵 hunk、带空格与中文的 `PCAUSE_HOME` 与提示词路径（init → snapshot → list）、CLI `snapshot --file` 回归、落盘文本无 BOM 无 CR。
+
+### Fixed
+
+- `pcause snapshot <id> --file <path>` 的「文件是否存在」守卫在某次行级脚本改写中被整行误删，导致文件存在时也永远报 `PCAUSE_NOT_FOUND`；已恢复守卫并补回归测试。
+- JSON 配置带 BOM 时 `JSON.parse` 直接失败的问题（现在先归一化再解析）。
+
+### Changed
+
+- 版本升到 0.13.0。
+
 ## [0.12.0] - 2026-11-07
 
 ### Added

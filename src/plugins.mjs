@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readTextFile } from './encoding.mjs';
 
 const RESERVED = {
   provider: new Set(['mock', 'deepseek', 'doubao']),
@@ -50,7 +51,7 @@ export function loadPluginRegistry(explicit) {
   }
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    raw = JSON.parse(readTextFile(file));
   } catch (err) {
     throw pluginError(`插件配置不是合法 JSON：${file}（${err.message}）`);
   }

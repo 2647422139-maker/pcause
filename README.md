@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-185%2F185%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-197%2F197%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.13 更新摘要
+
+跨平台兼容：把「Windows 上路径 / 中文 / 换行」这类只在别人机器上炸的问题，变成每次都跑的离线测试。
+
+- **读入层统一归一化**：新增 `src/encoding.mjs`（`stripBom` / `normalizeNewlines` / `normalizeText` / `readTextFile`）。所有文本入口（提示词文件、探针 `.jsonl`、插件配置 `pcause.config.json`）在「读文件之后、业务逻辑之前」剥离 UTF-8 BOM、把 CRLF 与孤立 CR 统一成 LF，避免幽灵 hunk、指纹漂移、BOM 让 `JSON.parse` 直接失败。
+- **diff 不再被换行差异污染**：`splitLines` 走同一套归一化，同一份提示词用 CRLF 保存或用 LF 保存，得到**完全相同**的 hunk；旧实现只是替换 CRLF，BOM 仍会变成第一个字符差。
+- **真实 bug**：`pcause snapshot <id> --file <path>` 的「文件存在性守卫」在某次行级脚本改写中被整行误删，导致文件明明存在也永远报 `PCAUSE_NOT_FOUND`。已修复，并加两条回归测试（存在的文件能读、文件确实不存在时仍正确报错）。
+- **路径形态**：测试覆盖 `PCAUSE_HOME` 与提示词文件位于「带空格 + 中文」的目录下的完整链路（init → snapshot → list），以及中文路径工作区的快照读取。
+- 自测 **197/197**（新增 12 项：BOM 剥离、换行归一、组合归一、CRLF+BOM 读文件、BOM JSON、CRLF+BOM `.jsonl` 探针、CRLF 不产生幽灵 hunk、中文空格路径 init、snapshot --file 回归、落盘归一化、中文路径 list、缺文件报错回归）。
 
 ## v1.12 更新摘要
 
@@ -13,7 +23,7 @@
 - **真的抓到了 bug**：`package.json` 的 `files` 白名单漏了 `scripts/`，而 `package.json` 的 `preflight` 脚本又引用了 `scripts/preflight.mjs` —— 本地没事，装完 `npm run preflight` 会找不到文件。演练当场失败，修复后 10/10 通过。
 - 顺带校验：发布包必须含 `src/cli.mjs` / `schema/` / `examples/` / `docs/` / `CHANGELOG.md` / `LICENSE` / `scripts/`；绝不能含 `.pcause/`、`test/`、`.github/`、`node_modules/`；安装包里的 bin 必须有合法 shebang（`.gitattributes` 已强制 `.mjs` 用 LF，避免 Windows 下 CRLF 破坏 `#!`）。
 - 名字可用性：`npm view pcause` 返回 404，说明 `pcause` 这个包名还没有被占用（真要发布仍需 `npm login` + `npm publish`，本仓库未执行发布）。
-- 自测 **185/185**（新增 11 项：路径归一、必含清单、缺文件/混入检测、shebang 兼容 LF/CRLF、演练 10/10、独立目录安装、shim 与直连云）。
+- 自测 **185/185**（新增 11 项：路径归一、必含清单、缺文件/混入检测、shebang 兼容 LF/CRLF、演练 10/10、独立目录安装、shim 与直连云；v1.13 起为 197/197）。
 
 ## v1.11 更新摘要
 
@@ -204,7 +214,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 185/185 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 197/197 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 

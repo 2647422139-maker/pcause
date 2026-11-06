@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import { PcauseError, usage, notFound } from './errors.mjs';
+import { readTextFile } from './encoding.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -47,7 +48,7 @@ function writeJSON(file, data) {
 }
 
 function readJSON(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(readTextFile(file));
 }
 
 function safeId(id) {
@@ -141,7 +142,7 @@ export function newId(prefix) {
 // ---------- 探针文件 ----------
 export function readProbes(file, { limit = 0, warn = () => {} } = {}) {
   if (!fs.existsSync(file)) throw new PcauseError('PCAUSE_NOT_FOUND', `找不到探针文件：${file}`, '探针文件支持 .json 数组、.jsonl 或纯文本一行一个输入；检查路径与拼写');
-  const raw = fs.readFileSync(file, 'utf8');
+  const raw = readTextFile(file);
   const probes = [];
   if (/\.json$/i.test(file)) {
     const arr = JSON.parse(raw);

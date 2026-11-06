@@ -14,6 +14,7 @@ import { buildMarkdown, buildHtml } from './report.mjs';
 import { compareAttributions, buildCompareMarkdown } from './compare.mjs';
 import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
 import { PcauseError, usage, notInitialized, formatError } from './errors.mjs';
+import { readTextFile } from './encoding.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(HERE, '..');
@@ -295,8 +296,10 @@ function cmdSnapshot(flags, pos) {
   let text;
   if (flags.file) {
     const file = path.resolve(flags.file);
-    throw new PcauseError('PCAUSE_NOT_FOUND', '找不到文件：' + file, '检查路径是否存在；Windows 路径含空格时请用引号包住');
-    text = fs.readFileSync(file, 'utf8');
+    if (!fs.existsSync(file)) {
+      throw new PcauseError('PCAUSE_NOT_FOUND', '找不到文件：' + file, '检查路径是否存在；Windows 路径含空格时请用引号包住');
+    }
+    text = readTextFile(file);
   } else if (typeof flags.text === 'string') {
     text = flags.text;
   } else {

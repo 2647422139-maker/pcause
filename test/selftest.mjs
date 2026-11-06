@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.12.0', '版本号升到 0.12.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.13.0', '版本号升到 0.13.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.12.0'), 'CLI 版本号与 package.json 同步（0.12.0）');
+check(String(cliVersion.stdout).includes('0.13.0'), 'CLI 版本号与 package.json 同步（0.13.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -695,6 +695,52 @@ check(pcResult.checks.some((c) => c.name.includes('独立临时目录安装')), 
 check(pcResult.checks.some((c) => c.name.includes('shebang')), '演练校验安装包 bin 的 shebang');
 check(pcResult.checks.some((c) => c.name.includes('pcause version')), '演练通过 bin shim 真实执行 version');
 check(typeof pcResult.tarball === 'string' && pcResult.tarball.endsWith('.tgz'), 'tarball 名称可追溯（演练产物真实）');
+
+console.log('\n[23/23] v1.13：Windows / 中文路径 / CRLF 兼容');
+const enc = await import('../src/encoding.mjs');
+check(enc.stripBom('\uFEFFabc') === 'abc' && enc.stripBom('abc') === 'abc', 'BOM 剥离：有则去掉、无则不动');
+check(enc.normalizeNewlines('a\r\nb\rc\n') === 'a\nb\nc\n', 'CRLF 与孤立 CR 统一为 LF');
+check(enc.normalizeText('\uFEFFa\r\nb') === 'a\nb', 'BOM + CRLF 组合一次归一化');
+
+// 目录名带空格与中文：Windows 上最容易出问题的路径形态
+const winDir = path.join(tmpRoot, '路径 带空格 与 中文');
+fs.mkdirSync(winDir, { recursive: true });
+const crlfPrompt = path.join(winDir, '带 BOM 的提示词.md');
+fs.writeFileSync(crlfPrompt, '\uFEFF第一行\r\n第二行\r\n第三行\r\n', 'utf8');
+check(enc.readTextFile(crlfPrompt) === '第一行\n第二行\n第三行\n', 'readTextFile 读 CRLF+BOM 文件后得到纯 LF 文本');
+
+const bomJson = path.join(winDir, 'pcause.config.json');
+fs.writeFileSync(bomJson, '\uFEFF{"provider":{},"judge":{}}', 'utf8');
+let bomParsed = null;
+try {
+  bomParsed = JSON.parse(enc.readTextFile(bomJson));
+} catch {}
+check(!!bomParsed && typeof bomParsed === 'object', '带 BOM 的 JSON 配置仍可解析（插件配置常见）');
+
+const crlfProbes = path.join(winDir, '探针 CRLF.jsonl');
+fs.writeFileSync(crlfProbes, '\uFEFF{"id":"p1","input":"你好"}\r\n// 注释行\r\n{"id":"p2","input":"再见"}\r\n', 'utf8');
+const probes23 = readProbes(crlfProbes);
+check(probes23.length === 2 && probes23[0].id === 'p1' && probes23[1].input === '再见', 'CRLF+BOM 的 .jsonl 探针可解析、注释行被跳过');
+
+const hunksLf = diffHunks(V1, V2);
+const hunksCrlf = diffHunks(V1.replace(/\n/g, '\r\n'), V2.replace(/\n/g, '\r\n'));
+check(
+  hunksLf.length === 3 && hunksCrlf.length === 3 && JSON.stringify(hunksCrlf.map((h) => h.newLines)) === JSON.stringify(hunksLf.map((h) => h.newLines)),
+  'CRLF 输入不产生幽灵 hunk，hunk 内容与 LF 完全一致'
+);
+
+// 回归：R8 的「行级替换」曾把 snapshot --file 的 if (!existsSync) 守卫整行删掉，导致文件明明存在也永远报 NOT_FOUND
+const home23 = path.join(winDir, 'pcause home');
+const env23 = { ...process.env, PCAUSE_HOME: home23 };
+check(runRaw(['init'], env23).status === 0, '中文 + 空格路径的 PCAUSE_HOME 可初始化');
+const rSnap23 = runRaw(['snapshot', 'crlf-prompt', '--file', crlfPrompt], env23);
+check(rSnap23.status === 0 && String(rSnap23.stdout).includes('已保存快照'), 'CLI snapshot --file 能读 CRLF+BOM 文件（修复前会被守卫误删逻辑挡住）');
+const promptFiles23 = fs.existsSync(path.join(home23, 'prompts')) ? fs.readdirSync(path.join(home23, 'prompts')) : [];
+const savedText23 = promptFiles23.length ? JSON.parse(fs.readFileSync(path.join(home23, 'prompts', promptFiles23[0]), 'utf8')).text : '';
+check(savedText23.length > 0 && !savedText23.includes('\r') && !savedText23.startsWith('\uFEFF'), '快照落盘的是归一化文本（无 BOM、无 CR）');
+check(String(runRaw(['list'], env23).stdout).includes('crlf-prompt'), '中文路径工作区里的快照可被 list 列出');
+const rMissing23 = runRaw(['snapshot', 'x', '--file', path.join(winDir, '不存在.md')], env23);
+check(rMissing23.status === 1 && String(rMissing23.stderr).includes('PCAUSE_NOT_FOUND'), '文件确实不存在时仍报 PCAUSE_NOT_FOUND（修复没破坏错误路径）');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

@@ -14,6 +14,7 @@ export const REQUIRED_IN_TARBALL = [
   'package.json',
   'src/cli.mjs',
   'src/errors.mjs',
+  'src/encoding.mjs',
   'schema/attribution.schema.json',
   'examples/probes.jsonl',
   'docs/demo-report.html',
