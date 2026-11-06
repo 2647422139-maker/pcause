@@ -9,7 +9,7 @@ import {
   saveAttribution, getAttribution, listAttributions, saveRun, readProbes,
 } from './store.mjs';
 import { diffHunks, describeHunk } from './diff.mjs';
-import { attribute, VERDICT_LABEL } from './attribute.mjs';
+import { attribute, planCalls, VERDICT_LABEL } from './attribute.mjs';
 import { buildMarkdown, buildHtml } from './report.mjs';
 import { compareAttributions, buildCompareMarkdown } from './compare.mjs';
 import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
@@ -33,6 +33,13 @@ const HELP = `pcause —— 提示词因果归因器
                                                  对比两次归因的结论迁移（签名不一致时拒绝，避免误读）
   pcause schema [--out file]                     导出机器可读结果的 JSON Schema
   pcause selftest                                离线自测
+  pcause version                                 打印版本号
+
+注意：compare 不是「两次回答谁更好」的打分对比，而是因果结论迁移对比
+      （同一实验条件下，某个改动块的影响是否变了）；要打分评测请用专门的 eval 工具。
+
+run 选项：与 attribute 相同的生成类选项（--provider / --model / --limit / --concurrency /
+          --dry-run / --max-calls 等）；判定、采样、复核、门禁选项仅 attribute 使用。
 
 attribute 选项：
   --provider mock|deepseek|doubao   生成模型（默认 deepseek）
@@ -48,7 +55,7 @@ attribute 选项：
   --temperature <n>                 采样温度（默认 0，保证可复现）
   --config <file>                   插件配置文件（默认 ./pcause.config.json 或 $PCAUSE_CONFIG）
   --limit <n>                       只用前 n 个探针
-  --max-calls <n>                   模型调用预算（默认 400，含判定器调用；预算不足的块标记「采样不足」）
+  --max-calls <n>                   模型调用预算（默认 400，单位是「模型请求次数」，不是 token 或金额；含判定器调用）
   --dry-run                         只预估调用量与预算是否够，不发起任何请求、不读 API Key
   --fail-on decisive|partial        CI 门禁：命中则退出码 2（采样不足的块不参与门禁）
   --json                            输出符合 schema/attribution.schema.json 的完整 JSON
@@ -174,6 +181,19 @@ async function cmdAttribute(flags) {
     tick('');
     for (const h of plan.hunks) tick(`  ${h.id}  ${h.summary}`);
     return 0;
+  }
+
+  // 运行前先给一行消耗预估（仅估算，实际会因缓存命中更少），避免「预算到底指什么」的误解
+  if (!flags.json) {
+    try {
+      const preview = await attribute(opts, { log: () => {}, dryRun: true });
+      const p = preview.plan;
+      const span = p.earlyStop ? `；自适应采样区间约 ${p.plannedCallsMin}~${p.plannedCalls}` : '';
+      tick(`\n计划：${p.hunks} 个改动块 × ${p.probes} 个探针 × 每探针 ${p.samples} 次 → 预计 ≤${p.plannedCalls} 次模型调用（预算 ${p.maxCalls}）${span}`);
+      tick('  提示：预算单位是模型请求次数，不是 token 或金额；命中缓存会少于预估。');
+    } catch {
+      // 预估失败不阻断正式运行
+    }
   }
 
   const attr = await attribute(opts, { log });
@@ -438,9 +458,11 @@ async function main() {
       return cmdSchema(flags);
     case 'selftest':
       return cmdSelftest();
-    case 'version':
-      tick('pcause 0.7.0');
+    case 'version': {
+      const pkg = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
+      tick(`pcause ${pkg.version}`);
       return 0;
+    }
     case 'help':
     case '--help':
     case '-h':

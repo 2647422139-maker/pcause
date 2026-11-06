@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-126%2F126%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-132%2F132%20passing-brightgreen)
+
+## v1.7 维护轮更新摘要
+
+首次使用者的三处「预期错位」被提前拦住（功能不变，只改提示与文档；`version` 改为从 `package.json` 读取，避免再出现硬编码版本号）：
+
+- **预算单位显式化**：正式运行前先打印一行 `计划：N 个改动块 × P 个探针 × 每探针 S 次 → 预计 ≤X 次模型调用（预算 Y）`，并紧跟一句「预算单位是模型请求次数，不是 token 或金额；命中缓存会少于预估」。自适应采样同时给出调用量区间，不再让人以为 `--max-calls` 是金额。
+- **kind 的大白话对照**：README 明确 `--kind` 描述的是提示词在系统中的**位置**（任务提示词 / 系统提示词 / Agent 指令），不是给输出打业务标签；选错会让判定维度错配。
+- **compare 的预期锁定**：README 与 `--help` 都写明它不做「两次回答谁更好」的打分对比，只回答「同一个改动块的影响这次是否还成立」。
+- **零 Key 上手路径**：快速开始增加 `--provider mock` 的离线跑通命令，装完先看报告长什么样，再决定是否接真模型。
+- 自测 **132/132**（新增 6 项：预估行、预算单位提示、help 的 version/run/compare 说明）。
 
 ## v1.6 更新摘要
 
@@ -13,7 +23,7 @@
 - **agent（Agent 指令）**：看「活有没有干对」——任务达成度、工具调用策略、终止条件、状态与上下文延续、副作用风险；并明确多步探索 / 多次工具调用本身不算失败。
 - 判定维度同时写进 Markdown / HTML 报告的「判定维度」行，审阅时知道这一轮用的是哪套眼镜。
 - 判定提示词按 kind 分流后，模型通道的内容寻址缓存天然按 kind 分开，不会串用。
-- 自测现为 **126/126**（新增 13 项：三类判定提示词内容、未知 kind 回退、heuristic 行为不受 kind 影响、报告披露、版本号）。
+- 自测当时为 **126/126**（v1.7 起为 132/132）。
 
 ```bash
 pcause attribute --old start-v1 --new start-v2 --probes probes.jsonl \
@@ -137,12 +147,24 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 126/126 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 132/132 项离线自测，不联网、不花钱
 ```
 
 生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经本机 `doubao-bridge` 技能，无需任何 API Key）。
 
-跑演示（3 个探针 × 3 个改动块，自适应采样，约 1.5 分钟）：
+不想先配 Key？用 `mock` 通道离线跑通一次，先看清楚命令流和报告长什么样（秒级完成、零消耗）：
+
+```bash
+node src/cli.mjs init
+node src/cli.mjs snapshot triage-v1 --file examples/triage-v1.md
+node src/cli.mjs snapshot triage-v2 --file examples/triage-v2.md
+node src/cli.mjs attribute --old triage-v1 --new triage-v2 --probes examples/probes.jsonl \
+  --provider mock --judge heuristic --samples 2 --early-stop
+```
+
+`mock` 只是确定性假模型（只认「表格 / 温和」等关键词），**结论不能当真实分析**；真实归因把 `--provider` 换成 `deepseek`（或 `doubao`），判定器推荐 `--judge deepseek --verify doubao`。
+
+跑真实演示（3 个探针 × 3 个改动块，自适应采样，约 1.5 分钟）：
 
 ```bash
 node src/cli.mjs init
@@ -206,7 +228,10 @@ pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]
                                               对比两次归因的结论迁移（签名一致才允许，默认拒绝）
 pcause schema [--out file]                    导出机器可读结果 JSON Schema
 pcause selftest                               离线自测
+pcause version                                打印版本号
 ```
+
+> **`compare` 的预期**：它不是「两次回答谁更好」的打分对比，而是**因果结论迁移对比**——同一实验条件下，同一个改动块的影响是否变了。想做 A/B 打分评测，请用专门的 eval 工具；pcause 只回答「哪一处改动真正改变了行为、这次是否还成立」。
 
 `attribute` 常用选项：
 
@@ -222,12 +247,14 @@ pcause selftest                               离线自测
 | `--concurrency <n>` | 生成阶段并发请求数（默认 1；2~4 较快，过高易触发限流。预算按发起前预占，不会超支） |
 | `--config <file>` | 插件配置文件（默认 `./pcause.config.json`，或环境变量 `PCAUSE_CONFIG`；见 v1.4） |
 | `--limit <n>` | 只用前 n 个探针 |
-| `--max-calls <n>` | 模型调用预算（默认 400，含判定器调用；预算不足的块标记 `samplingInsufficient`，不再静默中止） |
+| `--max-calls <n>` | 模型调用预算（默认 400，**单位是模型请求次数，不是 token 或金额**；含判定器调用；预算不足的块标记 `samplingInsufficient`，不再静默中止） |
 | `--temperature <n>` | 采样温度（默认 0） |
 | `--dry-run` | 只预估调用量，不发起任何请求、不读 API Key |
 | `--fail-on decisive\|partial` | CI 门禁，命中则退出码 2（采样不足的块不参与） |
 | `--json` | 输出符合 schema 的完整 JSON（含元信息、逐块结论、汇总） |
 | `--json-out <file>` | 同时把这份 JSON 写到文件 |
+
+> **`--kind` 是什么**：它描述这段提示词在系统中的**位置**，不是给模型输出打业务标签。`prompt` = 任务提示词（默认），`system` = 系统提示词，`agent` = Agent 指令；选错会让判定维度错配（例如把系统提示词当任务提示词，就会漏看「安全拒答、角色边界、工具权限」这些在系统提示词里才重要的维度）。拿不准时先保持默认，报告里会标注本次使用的判定维度与假设可信度。
 
 `compare` 选项：
 
@@ -266,6 +293,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 4. v1.3 的并发设计同样先问过豆包：预算按**发起前预占**而不是等完成后再扣，否则 in-flight 请求会让预算透支；并发上限必须单独用 `--concurrency` 控制，不能拿预算当并发数用。它还提醒「重跑要按已完成采样点跳过、输出按固定序号排序」——pcause 用内容寻址缓存 + `(探针, 采样)` 固定落位实现，不需要额外状态文件。
 5. v1.4 的插件接口同样先与豆包对表：接口保持「Provider 只有 `generate`、Judge 只有 `judgeBatch`、`ctx` 只传只读配置」；它指出的头号风险是插件自行发起请求或递归调内部逻辑从而绕过核心的调用计数与缓存——因此 pcause 把预算与缓存收在核心包装层（一次 generate / 一个判定批次记 1 次调用），并要求插件名不得覆盖内置通道。本地插件的安全边界也写进了限制（可执行代码，只加载显式声明的本地文件）。
 6. v1.6 的判定维度适配由豆包先给结构：它主张 system 与 agent 是两种责任面——system 只看「守不守规则」、agent 只看「活有没有干对」，其余维度（话术润色、角色人设等）都该裁掉；并给了三类高频误判（规则内的合理变通被当越界、异常分支被硬卡格式、需要多步探索的任务被判失败）。实现采纳它的「阶段 1」建议：只做提示词分流、对外 schema 零改动、`--kind prompt` 逐字不变；结构化分维度打分与「system 违规一票否决 agent」的分层流水线留作后续演进。
+7. v1.7 维护轮请豆包扮演「第一次使用者」做可用性挑刺：它指出最致命的不是功能缺口，而是三个预期错位——把 `--kind` 当成输出业务标签、把预算当成金额、把 `compare` 当成打分对比。本轮据此只改提示与文档（运行前打印消耗预估、预算单位显式标注、kind 大白话对照、compare 预期锁定、增加零 Key 离线上手路径），不动判定与采样内核。
 
 ## 8. 目录结构
 
@@ -285,7 +313,7 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  126 项离线自测
+├── test/selftest.mjs  132 项离线自测
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json

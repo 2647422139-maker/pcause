@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.7.0', '版本号升到 0.7.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.7.1', '版本号升到 0.7.1');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,17 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.7.0'), 'CLI 版本号更新为 0.7.0');
+check(String(cliVersion.stdout).includes('0.7.1'), 'CLI 版本号更新为 0.7.1（版本号读 package.json，不再硬编码）');
+
+console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
+const rPlan = runCli(['--samples', '2']);
+check(rPlan.status === 0 && rPlan.stdout.includes('计划：'), '正式运行前打印一行消耗预估（计划：…）');
+check(rPlan.stdout.includes('预计 ≤') && rPlan.stdout.includes('预算'), '预估行含调用量上限与预算');
+check(rPlan.stdout.includes('预算单位是模型请求次数'), '明确预算单位是模型请求次数（不是 token/金额）');
+const rHelp = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'help'], { env: process.env, encoding: 'utf8' });
+check(String(rHelp.stdout).includes('pcause version'), 'help 列出 version 命令');
+check(String(rHelp.stdout).includes('run 选项'), 'help 说明 run 命令的可用选项');
+check(String(rHelp.stdout).includes('不是「两次回答谁更好」的打分对比'), 'help 里 compare 的预期被显式锁定');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
