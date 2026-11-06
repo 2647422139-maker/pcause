@@ -1,0 +1,8 @@
+{
+  "provider": {
+    "echo-system": { "module": "./plugins/echo-system-provider.mjs", "options": { "prefix": "" } }
+  },
+  "judge": {
+    "exact": { "module": "./plugins/exact-judge.mjs", "options": { "ignoreWhitespace": false } }
+  }
+}

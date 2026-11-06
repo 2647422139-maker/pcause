@@ -360,7 +360,101 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.4.0', '版本号升到 0.4.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.5.0', '版本号升到 0.5.0');
+
+console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
+const { loadPluginRegistry } = await import('../src/plugins.mjs');
+const { makeProvider } = await import('../src/providers.mjs');
+const { makeJudge } = await import('../src/judge.mjs');
+const exampleConfig = path.join(PKG_ROOT, 'examples', 'pcause.config.example.json');
+const reg = loadPluginRegistry(exampleConfig);
+check(reg.provider.has('echo-system') && reg.judge.has('exact'), '从 pcause.config.json 读取插件声明');
+
+let unknownErr = null;
+try {
+  await attribute({ old: 'v1', new: 'v2', probes: probesFile, provider: 'nope', judge: 'heuristic', config: exampleConfig, maxCalls: 10 }, { log: () => {} });
+} catch (err) {
+  unknownErr = err;
+}
+check(unknownErr?.code === 'PCAUSE_PLUGIN' && /echo-system/.test(unknownErr.message), '未知 provider 报错并列出已配置插件');
+
+const attrPlugin = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'echo-system', judge: 'exact', samples: 2, config: exampleConfig, maxCalls: 100 },
+  { log: () => {} }
+);
+check(attrPlugin.hunks.length === 3, '插件 provider + 插件 judge 能跑通完整归因');
+check(attrPlugin.noiseFloor === 0, '确定性插件 provider 的噪声地板为 0');
+check(attrPlugin.hunks.every((h) => h.verdict === 'decisive'), '内容精确比较插件判定三处改动均为决定性');
+check(attrPlugin.hunks.every((h) => Array.isArray(h.evidence) && h.evidence.length > 0), '插件归因同样产出逐块证据');
+
+const plug = makeProvider('echo-system', { config: exampleConfig });
+const out1 = await plug.generate({ system: 's1', user: 'u1' });
+const out2 = await plug.generate({ system: 's1', user: 'u1' });
+check(out1 === out2 && plug.stats.calls === 1 && plug.stats.cacheHits === 1, '插件 provider 接入核心缓存（第二次命中）');
+
+const pj = makeJudge('exact', { config: exampleConfig });
+const judgePairs = [{ a: 'aaa', b: 'a' }, { a: 'bb', b: 'bb' }];
+const v1 = await pj.judgeBatch(judgePairs);
+const v2 = await pj.judgeBatch(judgePairs);
+check(v1.length === 2 && v1[0].changed === true && v1[1].changed === false, '插件 judge 返回等长判定数组');
+check(pj.stats.calls === 1 && pj.stats.cacheHits === 1, '插件 judge 接入核心缓存');
+
+const writeCfg = (name, obj) => {
+  const p = path.join(tmpRoot, name);
+  fs.writeFileSync(p, JSON.stringify(obj));
+  return p;
+};
+const badModule = writeCfg('bad-module.json', { provider: { ghost: { module: './ghost.mjs' } } });
+let ghostErr = null;
+try {
+  await attribute({ old: 'v1', new: 'v2', probes: probesFile, provider: 'ghost', judge: 'heuristic', config: badModule, maxCalls: 10 }, { log: () => {} });
+} catch (err) {
+  ghostErr = err;
+}
+check(ghostErr?.code === 'PCAUSE_PLUGIN' && /不存在/.test(ghostErr.message), '插件模块缺失时报明确错误');
+
+const badShapeModule = path.join(tmpRoot, 'bad-shape.mjs');
+fs.writeFileSync(badShapeModule, 'export default function () { return {}; }\n');
+const badShapeCfg = writeCfg('bad-shape.json', { judge: { half: { module: './bad-shape.mjs' } } });
+let shapeErr = null;
+try {
+  await attribute({ old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'half', config: badShapeCfg, maxCalls: 10 }, { log: () => {} });
+} catch (err) {
+  shapeErr = err;
+}
+check(shapeErr?.code === 'PCAUSE_PLUGIN' && /judgeBatch/.test(shapeErr.message), '插件缺少必需方法时拒绝加载');
+
+const badJson = path.join(tmpRoot, 'bad.json');
+fs.writeFileSync(badJson, '{ not json');
+let jsonErr = null;
+try {
+  loadPluginRegistry(badJson);
+} catch (err) {
+  jsonErr = err;
+}
+check(jsonErr?.code === 'PCAUSE_PLUGIN', '非法配置文件被拒绝');
+
+const reservedCfg = writeCfg('reserved.json', { provider: { deepseek: { module: './ghost.mjs' } } });
+let reservedErr = null;
+try {
+  loadPluginRegistry(reservedCfg);
+} catch (err) {
+  reservedErr = err;
+}
+check(reservedErr?.code === 'PCAUSE_PLUGIN' && /内置/.test(reservedErr.message), '禁止用插件覆盖内置通道');
+
+const rPlugin = spawnSync(
+  process.execPath,
+  [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'attribute', '--old', 'v1', '--new', 'v2', '--probes', probesFile, '--provider', 'echo-system', '--judge', 'exact', '--config', exampleConfig, '--max-calls', '100', '--json'],
+  { env: process.env, encoding: 'utf8' }
+);
+let pluginJson = null;
+try {
+  pluginJson = JSON.parse(rPlugin.stdout);
+} catch {
+  pluginJson = null;
+}
+check(rPlugin.status === 0 && !!pluginJson && validatePublicJSON(pluginJson).length === 0, 'CLI --config 加载插件并输出合规 JSON');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

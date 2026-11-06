@@ -44,6 +44,7 @@ attribute 选项：
   --concurrency <n>                 生成阶段的并发请求数（默认 1；2~4 更快，过高易触发限流）
   --repeats <n>                     --samples 的旧别名
   --temperature <n>                 采样温度（默认 0，保证可复现）
+  --config <file>                   插件配置文件（默认 ./pcause.config.json 或 $PCAUSE_CONFIG）
   --limit <n>                       只用前 n 个探针
   --max-calls <n>                   模型调用预算（默认 400，含判定器调用；预算不足的块标记「采样不足」）
   --dry-run                         只预估调用量与预算是否够，不发起任何请求、不读 API Key
@@ -142,6 +143,7 @@ async function cmdAttribute(flags) {
     concurrency: num(flags.concurrency, 1),
     cache: flags.cache !== 'false',
     kind,
+    config: flags.config,
   };
   const log = flags.json ? () => {} : (msg) => console.error('· ' + msg);
 
@@ -293,6 +295,7 @@ async function cmdRun(flags, pos) {
   const provider = makeProvider(flags.provider || 'deepseek', {
     model: flags.model,
     temperature: num(flags.temperature, 0),
+    config: flags.config,
   });
   const concurrency = Math.max(1, num(flags.concurrency, 1));
   const outputs = await mapLimit(
@@ -426,7 +429,7 @@ async function main() {
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.4.0');
+      tick('pcause 0.5.0');
       return 0;
     case 'help':
     case '--help':

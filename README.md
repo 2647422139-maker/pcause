@@ -3,7 +3,30 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-80%2F80%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-94%2F94%20passing-brightgreen)
+
+## v1.4 更新摘要
+
+新增 **Provider / Judge 插件注册表**：在项目根放一个 `pcause.config.json`，就能把自建或私有通道接进归因循环——记账、缓存、预算、报告与内置通道走同一套核心逻辑。
+
+```json
+{
+  "provider": { "echo-system": { "module": "./plugins/echo-system-provider.mjs", "options": { "prefix": "" } } },
+  "judge":    { "exact":       { "module": "./plugins/exact-judge.mjs",       "options": {} } }
+}
+```
+
+```bash
+pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl \
+  --provider echo-system --judge exact --config ./pcause.config.json
+```
+
+插件契约只有两个方法：
+
+- Provider：`export default function (options) → { generate({ system, user, ctx }) → Promise<string> }`
+- Judge：`export default function (options) → { judgeBatch(pairs, ctx) → Promise<[{ changed, reason }]> }`
+
+`ctx` 只含只读的 `{ kind, name, configFile, options }`，不暴露核心状态。**预算与缓存由核心统一负责**：一次 `generate` / 一个判定批次记 1 次调用，插件内部不要自行重试放大调用量；插件名不能覆盖 `mock / deepseek / doubao / heuristic` 等内置通道；只加载配置里显式声明的本地模块，不做远程加载。可运行示例见 [`examples/plugins/`](examples/plugins/) 与 [`examples/pcause.config.example.json`](examples/pcause.config.example.json)（离线、确定性）。自测现为 **94/94**（新增 14 项插件断言：注册、加载、缓存、预算、错误路径、CLI 集成）。
 
 ## v1.3 更新摘要
 
@@ -163,6 +186,7 @@ pcause selftest                               离线自测
 | `--kind prompt\|system\|agent` | 归因对象类型（默认 prompt；只影响报告里的假设可信度提示，不改变判定逻辑） |
 | `--samples <n>` | 每探针独立生成 n 次（默认 1；**≥2 才会测噪声地板并校正，推荐 2~3**） |
 | `--concurrency <n>` | 生成阶段并发请求数（默认 1；2~4 较快，过高易触发限流。预算按发起前预占，不会超支） |
+| `--config <file>` | 插件配置文件（默认 `./pcause.config.json`，或环境变量 `PCAUSE_CONFIG`；见 v1.4） |
 | `--limit <n>` | 只用前 n 个探针 |
 | `--max-calls <n>` | 模型调用预算（默认 400，含判定器调用；预算不足的块标记 `samplingInsufficient`，不再静默中止） |
 | `--temperature <n>` | 采样温度（默认 0） |
@@ -206,6 +230,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 2. 第二轮把清单收敛到「一次迭代能完成、测试、发版」的范围：保留 `--kind` + 固定免责、`--dry-run` + 预算语义、CI 门禁、稳定 JSON schema 四项（全部是观测层 / 包装层，不动判定与采样内核）；采样提前停止、插件注册表、两次归因结论对比按规定进入 v1.2 路线。
 3. v1.2 的第一项按 roadmap 落地为 `compare`，其设计又回到豆包确认：签名必须包含探针集、采样数、生成器与判定器；对比时最容易翻车的是「只比 verdict、忽略 hunk 对齐错位」，所以实现用内容做主键、只比同一改动块的前后结论。
 4. v1.3 的并发设计同样先问过豆包：预算按**发起前预占**而不是等完成后再扣，否则 in-flight 请求会让预算透支；并发上限必须单独用 `--concurrency` 控制，不能拿预算当并发数用。它还提醒「重跑要按已完成采样点跳过、输出按固定序号排序」——pcause 用内容寻址缓存 + `(探针, 采样)` 固定落位实现，不需要额外状态文件。
+5. v1.4 的插件接口同样先与豆包对表：接口保持「Provider 只有 `generate`、Judge 只有 `judgeBatch`、`ctx` 只传只读配置」；它指出的头号风险是插件自行发起请求或递归调内部逻辑从而绕过核心的调用计数与缓存——因此 pcause 把预算与缓存收在核心包装层（一次 generate / 一个判定批次记 1 次调用），并要求插件名不得覆盖内置通道。本地插件的安全边界也写进了限制（可执行代码，只加载显式声明的本地文件）。
 
 ## 8. 目录结构
 
@@ -219,12 +244,13 @@ pcause/
 │   ├── judge.mjs      判定器：heuristic / deepseek / doubao
 │   ├── attribute.mjs  归因引擎（采样、噪声地板、校正、第二意见、预算护栏、dry-run 预估）
 │   ├── concurrency.mjs 有界并发调度（保序、失败即停调度、进度回调）
+│   ├── plugins.mjs    Provider / Judge 插件注册表（pcause.config.json、动态 import、接口校验）
 │   ├── compare.mjs    归因结论迁移对比（签名校验、按内容对齐 hunk、迁移报告）
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  80 项离线自测
-├── examples/          分类器演示的提示词与探针
+├── test/selftest.mjs  94 项离线自测
+├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json
 ```
@@ -241,6 +267,7 @@ pcause/
 - **JSON schema 治理**：核心字段（`meta / hunks / summary`）冻结、按语义化版本维护；新能力优先放进 `extensions`，破坏性变更需升主版本号并同步更新 CI 逻辑。
 - **`compare` 只比结论，不重跑实验**：它对比的是两轮归因各自的结论，不会替你重新采样；两次实验间隔期间换了模型服务商、探针或采样数都会被签名校验拦下（可 `--allow-incompatible` 强看，但差异可能来自实验条件）。另外，若「同一句改动」被改写过措辞（旧行/新行内容变了），会被当成「消失 + 新增」，因为对齐主键是内容。
 - **并发只作用于生成阶段**：判定器与复核仍按批串行（保持判定批次可解释），`--concurrency` 过大容易触发 API 限流，建议 2~4。预算为「发起前预占」，并发下不会超支，但预算紧张时可能比串行更早进入「采样不足」。
+- **插件是可执行代码，不是沙箱**：pcause 只加载 `pcause.config.json` 里显式声明的本地模块（不做远程加载、不自动安装），但插件会以你的用户权限运行，请只使用信任的插件。预算按「一次 `generate` / 一个判定批次 = 1 次调用」记账，若插件内部自己发多次请求，实际成本会超出统计口径（核心无法感知，需插件作者自负）。插件模块在进程内只初始化一次，修改插件后需重新运行命令。
 
 ## 10. 许可
 

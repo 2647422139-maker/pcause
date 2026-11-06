@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { cacheGet, cachePut } from './store.mjs';
+import { loadPluginRegistry, pluginEntry, loadPlugin, pluginContext, pluginError } from './plugins.mjs';
 
 const DEEPSEEK_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
 
@@ -73,6 +74,11 @@ export function mockGenerate(system, user) {
 }
 
 export function makeProvider(name, opts = {}) {
+  // 非内置名称 → 查找用户插件（插件声明来自 pcause.config.json）
+  if (name !== 'mock' && name !== 'deepseek' && name !== 'doubao') {
+    const registry = loadPluginRegistry(opts.config);
+    return makePluginProvider(pluginEntry('provider', name, registry), opts);
+  }
   const model = opts.model || (name === 'mock' ? 'mock-1' : name === 'deepseek' ? 'deepseek-flash' : 'doubao-desktop');
   const temperature = opts.temperature ?? 0;
   const maxTokens = opts.maxTokens ?? 1200;
@@ -136,6 +142,42 @@ export function makeProvider(name, opts = {}) {
   }
 
   return { name, model, generate, stats };
+}
+
+// ---- 插件 Provider ----
+// 契约：模块 export default function (options) 返回 { generate({ system, user, ctx }) → Promise<string> }
+// 预算由核心统一记账：一次 generate 记一次调用；缓存按「插件模块 + options + 模型 + 输入」内容寻址。
+function makePluginProvider(entry, opts = {}) {
+  const model = opts.model || entry.options.model || `plugin:${entry.name}`;
+  const useCache = opts.cache !== false;
+  const stats = { calls: 0, cacheHits: 0 };
+  const getImpl = () => loadPlugin(entry);
+
+  async function generate({ system, user }) {
+    const key = JSON.stringify({ pluginProvider: entry.cacheKey, model, system, user });
+    if (useCache) {
+      const hit = cacheGet(key);
+      if (hit != null) {
+        stats.cacheHits++;
+        return hit;
+      }
+    }
+    const impl = await getImpl();
+    let output;
+    try {
+      output = await impl.generate({ system, user, ctx: pluginContext(entry) });
+    } catch (err) {
+      throw pluginError(`Provider 插件 "${entry.name}" 执行失败：${err.message}`);
+    }
+    if (typeof output !== 'string') {
+      throw pluginError(`Provider 插件 "${entry.name}" 的 generate 必须返回字符串（实际：${typeof output}）`);
+    }
+    stats.calls++;
+    if (useCache) cachePut(key, output);
+    return output;
+  }
+
+  return { name: entry.name, model, generate, stats };
 }
 
 function callDoubao(system, user, opts = {}) {

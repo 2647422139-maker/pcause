@@ -1,7 +1,9 @@
 // 判定器：判断「两个输出是否发生实质性行为变化」
-// heuristic = 离线快速筛查；deepseek / doubao = 语义级判定（可作第二意见）
+// heuristic = 离线快速筛查；deepseek / doubao = 语义级判定（可作第二意见）；其余名称走本地插件
 
 import { makeProvider } from './providers.mjs';
+import { cacheGet, cachePut } from './store.mjs';
+import { loadPluginRegistry, pluginEntry, loadPlugin, pluginContext, pluginError } from './plugins.mjs';
 
 // 一次判定请求里放多少组输出对；--dry-run 的调用量预估依赖这个常量。
 export const JUDGE_BATCH_SIZE = 6;
@@ -88,7 +90,9 @@ export function makeJudge(name, opts = {}) {
     };
   }
   if (name !== 'deepseek' && name !== 'doubao') {
-    throw new Error(`未知 judge：${name}（可选 heuristic / deepseek / doubao）`);
+    // 非内置名称 → 查找用户插件（插件声明来自 pcause.config.json）
+    const registry = loadPluginRegistry(opts.config);
+    return makePluginJudge(pluginEntry('judge', name, registry), opts);
   }
   const provider = makeProvider(name, { model: opts.model, temperature: 0, maxTokens: 1200, cache: opts.cache });
   return {
@@ -133,6 +137,56 @@ export function makeJudge(name, opts = {}) {
             fallback: true,
             reason: 'LLM 判定失败，回退启发式：' + heuristicJudge(pair.a, pair.b).reason,
           }));
+        }
+        results.push(...verdicts);
+      }
+      return results;
+    },
+  };
+}
+
+// ---- 插件 Judge ----
+// 契约：模块 export default function (options) 返回 { judgeBatch(pairs, ctx) → Promise<[{ changed, reason }]> }
+// 核心负责分批（沿用 JUDGE_BATCH_SIZE）、预算记账与内容寻址缓存：一个批次 = 一次调用。
+function makePluginJudge(entry, opts = {}) {
+  const model = opts.model || entry.options.model || `plugin:${entry.name}`;
+  const useCache = opts.cache !== false;
+  const stats = { calls: 0, cacheHits: 0 };
+  const getImpl = () => loadPlugin(entry);
+
+  return {
+    name: entry.name,
+    model,
+    stats,
+    async judgeBatch(pairs, { batchSize = JUDGE_BATCH_SIZE } = {}) {
+      const results = [];
+      for (let offset = 0; offset < pairs.length; offset += batchSize) {
+        const batch = pairs.slice(offset, offset + batchSize);
+        const key = JSON.stringify({ pluginJudge: entry.cacheKey, batch });
+        let verdicts = null;
+        if (useCache) {
+          const hit = cacheGet(key);
+          if (hit != null) {
+            stats.cacheHits++;
+            verdicts = hit;
+          }
+        }
+        if (!verdicts) {
+          const impl = await getImpl();
+          let out;
+          try {
+            out = await impl.judgeBatch(batch, pluginContext(entry));
+          } catch (err) {
+            throw pluginError(`判定插件 "${entry.name}" 执行失败：${err.message}`);
+          }
+          if (!Array.isArray(out) || out.length !== batch.length) {
+            throw pluginError(
+              `判定插件 "${entry.name}" 的 judgeBatch 必须返回与输入等长的数组（期望 ${batch.length}，实际 ${Array.isArray(out) ? out.length : typeof out}）`
+            );
+          }
+          verdicts = out.map((v) => ({ changed: !!v?.changed, reason: String(v?.reason ?? ''), fallback: false }));
+          stats.calls++;
+          if (useCache) cachePut(key, verdicts);
         }
         results.push(...verdicts);
       }
