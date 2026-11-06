@@ -1,5 +1,6 @@
 // 模型通道：mock（离线确定性）/ deepseek（API）/ doubao（复用已登录豆包桌面版，零 Key）
 import fs from 'node:fs';
+import { PcauseError } from './errors.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -20,7 +21,7 @@ function readDeepseekKey() {
     const m = text.match(/^\s*DEEPSEEK_API_KEY\s*:\s*["']?([^"'\s#]+)/m);
     if (m) return m[1].trim();
   }
-  throw new Error('找不到 DEEPSEEK_API_KEY（设置环境变量，或写入 ~/.dsh/.credentials.yaml）');
+  throw new PcauseError('PCAUSE_ENV', '找不到 DEEPSEEK_API_KEY（设置环境变量，或写入 ~/.dsh/.credentials.yaml）', '设置环境变量 DEEPSEEK_API_KEY 后重试，或改用 --provider mock 做离线演示');
 }
 
 function findDoubaoBridge() {
@@ -31,7 +32,7 @@ function findDoubaoBridge() {
     path.resolve('..', 'doubao-bridge', 'doubao-ask.mjs'),
   ];
   const found = candidates.find((f) => fs.existsSync(f));
-  if (!found) throw new Error('找不到豆包桥接脚本 doubao-ask.mjs（设置 DOUBAO_BRIDGE 环境变量）');
+  if (!found) throw new PcauseError('PCAUSE_ENV', '找不到豆包桥接脚本 doubao-ask.mjs（设置 DOUBAO_BRIDGE 环境变量）', '安装 doubao-bridge skill，或用 DOUBAO_BRIDGE 指向 doubao-ask.mjs 的绝对路径');
   return found;
 }
 
@@ -63,7 +64,7 @@ async function postJSON(url, body, headers = {}, { retries = 2, timeoutMs = 120_
       clearTimeout(timer);
     }
   }
-  throw new Error('请求模型失败：' + (lastErr?.message || lastErr));
+  throw new PcauseError('PCAUSE_REQUEST', '请求模型失败：' + (lastErr?.message || lastErr), '多半是网络波动或额度限制，可直接重跑（结果按内容缓存，已完成的调用不会重复计费）；持续失败请检查 API Key 与配额');
 }
 
 /** 离线确定性 mock：仅根据系统提示词里的关键词产生行为，便于自测 */
@@ -127,7 +128,7 @@ export function makeProvider(name, opts = {}) {
         text = choice?.message?.content ?? '';
       }
       if (!text.trim()) {
-        throw new Error(`模型 ${model} 返回了空输出（finish_reason=${choice?.finish_reason}）`);
+        throw new PcauseError('PCAUSE_EMPTY_OUTPUT', `模型 ${model} 返回了空输出（finish_reason=${choice?.finish_reason}）`, '思考型模型可能把预算用在推理上；换 deepseek-v4-pro，或调大 max_tokens / 关闭思考');
       }
       output = text;
       stats.calls++;
@@ -135,7 +136,7 @@ export function makeProvider(name, opts = {}) {
       output = await callDoubao(system, user, opts);
       stats.calls++;
     } else {
-      throw new Error(`未知 provider：${name}（可选 mock / deepseek / doubao）`);
+      throw new PcauseError('PCAUSE_PLUGIN', `未知 provider：${name}（可选 mock / deepseek / doubao，或在 pcause.config.json 里注册插件）`, '检查 --provider 拼写；用插件时确认 --config 指向的配置文件存在且 provider 名称已注册');
     }
     if (useCache) cachePut(key, output);
     return output;

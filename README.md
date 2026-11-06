@@ -3,7 +3,21 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-140%2F140%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-153%2F153%20passing-brightgreen)
+
+## v1.9 更新摘要
+
+可诊断轮：不再只给「✖ 出错了」，而是给**能自助排查的两行**（错误码只用于诊断，退出码 0 / 1 / 2 语义不变）。
+
+- **统一错误出口** `src/errors.mjs`：所有运行错误带稳定错误码，例如 `PCAUSE_NOT_FOUND`（文件/快照/归因不存在）、`PCAUSE_INPUT`（探针文件格式错）、`PCAUSE_KIND`（`--kind` 拼错）、`PCAUSE_NO_DIFF`（两份提示词没差异——这是正常结果，明确说明）、`PCAUSE_PLUGIN`（未知 provider）、`PCAUSE_ENV`（缺 Key / 找不到豆包桥接）、`PCAUSE_REQUEST`（模型请求失败，多半可重试）、`PCAUSE_EMPTY_OUTPUT`（思考模型把预算用光）、`PCAUSE_INTERNAL`（内部不一致，建议反馈）、`PCAUSE_UNKNOWN_COMMAND`。
+- **报错只写 stderr、stdout 零污染**：默认输出「✖ [PCAUSE_xxx] 一句话原因」+「提示：下一步怎么做」；`--json` 输出的 stdout 仍然可以直接 `JSON.parse`。
+- **调试开关**：`PCAUSE_DEBUG=1` 才追加堆栈（默认隐藏内部细节）；`--help` 新增「出错时的诊断」与 `PCAUSE_CONFIG` / `PCAUSE_DEBUG` 说明。
+- 自测 **153/153**（新增 12 项：码格式、堆栈开关、未初始化 / 缺探针 / 未知 provider / 无差异 / 未知命令的码与退出码、stdout 不被污染、help 披露调试开关）。
+
+```text
+✖ [PCAUSE_NOT_FOUND] 找不到探针文件：nope.jsonl
+  提示：探针文件支持 .json 数组、.jsonl 或纯文本一行一个输入；检查路径与拼写
+```
 
 ## v1.8 更新摘要
 
@@ -13,7 +27,7 @@
 - **`files` 白名单**：发布包只含 `src/`、`schema/`、`examples/`、`docs/`、README、CHANGELOG、LICENSE；本地 `.pcause/` 工作区、测试脚本与 `pcause.config.json` 不会被打进包。
 - **CHANGELOG.md**：按 Keep a Changelog 轻量格式记录 0.1.0 → 0.8.0 的全部变更；发版时同步版本号。
 - **演示产物刷新**：`docs/demo-report.{md,html}` 与 `docs/demo-attribution.json` 用当前模板重新导出（含「判定维度」「采样策略」「采样披露」行）。
-- 自测 **141/141**（新增 9 项：engines、files 白名单、元数据、CHANGELOG 覆盖与版本同步、README 入口、LICENSE）。
+- 自测 **141/141**（新增 9 项：engines、files 白名单、元数据、CHANGELOG 覆盖与版本同步、README 入口、LICENSE；v1.9 起为 153/153）。
 
 ## v1.7 维护轮更新摘要
 
@@ -157,7 +171,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 141/141 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 153/153 项离线自测，不联网、不花钱
 ```
 
 版本变更历史见 [CHANGELOG.md](CHANGELOG.md)。发布包只包含 `src/`、`schema/`、`examples/`、`docs/` 与文档（见 `package.json` 的 `files` 白名单），本地 `.pcause/` 工作区不会被一起发布。
@@ -225,6 +239,27 @@ echo $?   # 0 无命中；2 命中门禁；1 运行错误
 ```
 
 演示用的机器可读结果见 [`docs/demo-attribution.json`](docs/demo-attribution.json)。
+
+## 4.1 出错时怎么办：错误码与自助排查（v1.9）
+
+所有运行错误（退出码 1）默认只在 **stderr** 输出两行：错误码 + 一句话原因、下一步提示。stdout 不受影响，脚本里用 `--json` 仍可直接解析。
+
+| 错误码 | 含义 | 通常怎么处理 |
+| --- | --- | --- |
+| `PCAUSE_USAGE` | 命令参数缺失 / 冲突 | 看提示里的用法，或 `pcause help` |
+| `PCAUSE_NOT_INIT` | 工作区不存在 | 先 `pcause init`（或用 `PCAUSE_HOME` 指定目录） |
+| `PCAUSE_NOT_FOUND` | 快照 / 归因 / 探针 / schema 文件不存在 | `pcause list` 看已有 id；检查路径（含空格要加引号） |
+| `PCAUSE_INPUT` | 探针文件格式非法 | `.jsonl` 要求一行一个 `{"id","input"}`；纯文本一行一个输入 |
+| `PCAUSE_KIND` | `--kind` 拼错 | 可选 `prompt / system / agent`；kind 是提示词位置，不是输出业务标签 |
+| `PCAUSE_NO_DIFF` | 新旧提示词逐行相同 | 这是正常结果，不是失败：没有可消融的改动 |
+| `PCAUSE_PLUGIN` | 未知 provider / judge | 内置 `mock / deepseek / doubao`；插件需在 `pcause.config.json` 注册 |
+| `PCAUSE_ENV` | 缺 `DEEPSEEK_API_KEY`，或找不到豆包桥接脚本 | 配 Key，或用 `DOUBAO_BRIDGE` 指向桥接脚本；不想配就先 `--provider mock` |
+| `PCAUSE_REQUEST` | 模型请求失败（网络 / 额度） | 多半可重试，直接重跑；已完成调用按内容缓存，不会重复计费 |
+| `PCAUSE_EMPTY_OUTPUT` | 模型返回空内容（思考型模型把预算用光） | 换 `deepseek-v4-pro` 或调大 `max_tokens` |
+| `PCAUSE_INTERNAL` | 内部不一致 / schema 不符（bug） | 附命令行与输出到 GitHub issue |
+| `PCAUSE_UNKNOWN_COMMAND` | 未知子命令 | `pcause help` |
+
+排错开关：`PCAUSE_DEBUG=1` 追加堆栈；`PCAUSE_CONFIG` 指定插件配置；`PCAUSE_HOME` 指定工作区。门禁命中（`--fail-on`，退出码 2）属于业务阻断，不进入错误码体系。
 
 ## 5. 命令
 

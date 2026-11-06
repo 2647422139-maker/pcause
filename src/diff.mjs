@@ -1,4 +1,5 @@
 // 行级 diff：把"旧提示词 → 新提示词"拆成若干 hunk（连续变更块）
+import { PcauseError } from './errors.mjs';
 // 每个 hunk 都是可独立回退的最小实验单元。
 
 export function splitLines(text) {
@@ -100,8 +101,10 @@ export function revertHunk(newText, hunk) {
   // 否则会静默产出一份错误的提示词，让整个归因实验建立在错误输入上。
   for (let k = 0; k < hunk.newLines.length; k++) {
     if (lines[hunk.newStart + k] !== hunk.newLines[k]) {
-      throw new Error(
-        `hunk ${hunk.id || '(无 id)'} 与当前提示词不匹配（第 ${hunk.newStart + k} 行），拒绝回退以避免产生错误提示词`
+      throw new PcauseError(
+        'PCAUSE_INTERNAL',
+        `hunk ${hunk.id || '(无 id)'} 与当前提示词不匹配（第 ${hunk.newStart + k} 行），拒绝回退以避免产生错误提示词`,
+        '这是内部不一致（多半是提示词在新旧版本对比后被修改过）；请用同一份新提示词重新 diff 后再归因'
       );
     }
   }

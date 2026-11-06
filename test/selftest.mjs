@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.8.0', '版本号升到 0.8.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.9.0', '版本号升到 0.9.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.8.0'), 'CLI 版本号与 package.json 同步（0.8.0）');
+check(String(cliVersion.stdout).includes('0.9.0'), 'CLI 版本号与 package.json 同步（0.9.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -609,6 +609,39 @@ check(firstVersion === pkgMeta.version, `CHANGELOG 最新条目与 package.json 
 const readmeText = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
 check(readmeText.includes('CHANGELOG.md'), 'README 提供版本历史入口');
 check(fs.existsSync(path.join(PKG_ROOT, 'LICENSE')), 'LICENSE 文件存在');
+
+console.log('\n[19/19] v1.9：结构化错误码与可诊断输出');
+const { usage, formatError } = await import('../src/errors.mjs');
+const formatted = formatError(usage('示例用法错误', '把参数补全后重试'));
+check(formatted.includes('✖ [PCAUSE_USAGE]') && formatted.includes('提示：把参数补全后重试'), 'formatError 输出「✖ [码] 原因 + 提示」两行');
+check(!formatted.includes('堆栈'), '默认不打印堆栈（不污染 stderr）');
+check(formatError(usage('示例', '提示'), { debug: true }).includes('堆栈'), 'PCAUSE_DEBUG=1 时追加堆栈');
+check(formatError(new Error('裸错误')).includes('[PCAUSE_ERROR]'), '未包装的普通错误回退到 PCAUSE_ERROR');
+
+const cliBin = path.join(PKG_ROOT, 'src', 'cli.mjs');
+const runRaw = (args, env = process.env) => spawnSync(process.execPath, [cliBin, ...args], { env, encoding: 'utf8' });
+const rNotInit = runRaw(['list'], { ...process.env, PCAUSE_HOME: path.join(tmpRoot, 'empty-home') });
+check(rNotInit.status === 1 && String(rNotInit.stderr).includes('PCAUSE_NOT_INIT'), '未初始化工作区报 PCAUSE_NOT_INIT 且退出码 1');
+check(String(rNotInit.stderr).includes('pcause init'), '报错提示直接给出下一步命令');
+
+const probeArgs = ['attribute', '--old', 'v1', '--new', 'v2', '--provider', 'mock', '--judge', 'heuristic'];
+const rBadProbe = runRaw([...probeArgs, '--probes', path.join(tmpRoot, 'nope.jsonl')]);
+check(rBadProbe.status === 1 && String(rBadProbe.stderr).includes('PCAUSE_NOT_FOUND'), '找不到探针文件报 PCAUSE_NOT_FOUND');
+const rBadProvider = runRaw([...probeArgs, '--probes', probesFile, '--provider', 'nope']);
+check(rBadProvider.status === 1 && String(rBadProvider.stderr).includes('PCAUSE_PLUGIN'), '未知 provider 报 PCAUSE_PLUGIN 并列出可选值');
+const rNoDiff = runRaw(['attribute', '--old', 'v1', '--new', 'v1', '--probes', probesFile, '--provider', 'mock', '--judge', 'heuristic']);
+check(rNoDiff.status === 1 && String(rNoDiff.stderr).includes('PCAUSE_NO_DIFF'), '两份提示词无差异报 PCAUSE_NO_DIFF（明确这是正常结果）');
+const rUnknown = runRaw(['nope']);
+check(rUnknown.status === 1 && String(rUnknown.stderr).includes('PCAUSE_UNKNOWN_COMMAND'), '未知命令报 PCAUSE_UNKNOWN_COMMAND 且退出码 1');
+const rPureJson = runRaw([...probeArgs, '--probes', probesFile, '--json']);
+let pureJson = null;
+try {
+  pureJson = JSON.parse(rPureJson.stdout);
+} catch {
+  pureJson = null;
+}
+check(rPureJson.status === 0 && !!pureJson && !rPureJson.stdout.includes('计划：'), '错误体系不污染 stdout（--json 仍可解析）');
+check(String(runRaw(['help']).stdout).includes('PCAUSE_DEBUG'), 'help 说明 PCAUSE_DEBUG 调试开关');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

@@ -13,6 +13,7 @@ import { attribute, planCalls, VERDICT_LABEL } from './attribute.mjs';
 import { buildMarkdown, buildHtml } from './report.mjs';
 import { compareAttributions, buildCompareMarkdown } from './compare.mjs';
 import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
+import { PcauseError, usage, notInitialized, formatError } from './errors.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(HERE, '..');
@@ -68,10 +69,16 @@ compare 选项：
 
 退出码：0 成功且未命中门禁；1 运行错误；2 命中 --fail-on 门禁（成功跑完，业务阻断）。
 
+出错时的诊断：
+  stderr 输出「✖ [PCAUSE_xxx] 一句话原因」+「提示：下一步怎么做」两行；stdout 不受影响（--json 仍可解析）。
+  设置 PCAUSE_DEBUG=1 时额外打印堆栈（默认隐藏）。错误码含义见 README「错误码与自助排查」。
+
 环境变量：
   DEEPSEEK_API_KEY    DeepSeek API Key（也可放在 ~/.dsh/.credentials.yaml）
   DOUBAO_BRIDGE       豆包桥接脚本路径（默认 ~/.dsh/skills/doubao-bridge/scripts/doubao-ask.mjs）
   PCAUSE_HOME         工作区目录（默认 ./.pcause）
+  PCAUSE_CONFIG       插件配置文件路径（默认 ./pcause.config.json）
+  PCAUSE_DEBUG        设为 1 时在错误输出后追加堆栈，便于反馈 bug
 `;
 
 function parseArgs(list) {
@@ -101,10 +108,11 @@ function parseArgs(list) {
 
 const num = (v, d) => (v === undefined || v === true ? d : Number(v));
 const tick = (s) => console.log(s);
+const EXIT_CODES = { OK: 0, ERROR: 1, GATE: 2 };
 
 function requireInit() {
   if (!isInitialized()) {
-    throw new Error(`工作区不存在（${storeRoot()}）。先运行：pcause init`);
+    throw notInitialized(storeRoot());
   }
 }
 
@@ -127,13 +135,13 @@ async function cmdAttribute(flags) {
   const newId = flags.new;
   const probesFile = flags.probes;
   if (!oldId || !newId || !probesFile) {
-    throw new Error('用法：pcause attribute --old <id> --new <id> --probes <file>');
+    throw usage('用法：pcause attribute --old <id> --new <id> --probes <file>');
   }
   const kind = flags.kind || 'prompt';
-  if (!KINDS.includes(kind)) throw new Error(`未知 --kind：${kind}（可选 ${KINDS.join(' / ')}）`);
+  if (!KINDS.includes(kind)) throw new PcauseError('PCAUSE_KIND', `未知 --kind：${kind}（可选 ${KINDS.join(' / ')}）`, '拿不准时先用默认 prompt；kind 描述提示词在系统中的位置，不是输出业务标签');
   const failOn = flags['fail-on'];
   if (failOn !== undefined && failOn !== 'decisive' && failOn !== 'partial') {
-    throw new Error('--fail-on 只接受 decisive 或 partial');
+    throw usage('--fail-on 只接受 decisive 或 partial');
   }
   const opts = {
     old: oldId,
@@ -200,7 +208,7 @@ async function cmdAttribute(flags) {
   const pub = toPublicJSON(attr);
   const schemaErrs = validatePublicJSON(pub);
   if (schemaErrs.length) {
-    throw new Error('内部结果不符合对外 schema（这是 bug，请反馈）：\n  - ' + schemaErrs.join('\n  - '));
+    throw new PcauseError('PCAUSE_INTERNAL', '内部结果不符合对外 schema（这是 bug，请反馈）：\n  - ' + schemaErrs.join('\n  - '), '把这段输出和命令行参数附到 GitHub issue；临时可用 --json 查看原始结果');
   }
   const { mdPath, htmlPath } = writeReports(attr, flags);
   if (typeof flags['json-out'] === 'string') {
@@ -261,7 +269,7 @@ async function cmdAttribute(flags) {
 function cmdDiff(flags, pos) {
   requireInit();
   const [oldId, newId] = pos;
-  if (!oldId || !newId) throw new Error('用法：pcause diff <old> <new>');
+  if (!oldId || !newId) throw usage('用法：pcause diff <old> <new>');
   const hunks = diffHunks(getPrompt(oldId).text, getPrompt(newId).text, {
     onDegrade: (n, m) =>
       tick(`⚠ 提示词较长（${n} / ${m} 行），已退化为整段替换，无法拆出细粒度改动块`),
@@ -283,16 +291,16 @@ function cmdDiff(flags, pos) {
 function cmdSnapshot(flags, pos) {
   requireInit();
   const id = pos[0];
-  if (!id) throw new Error('用法：pcause snapshot <id> --file <path> 或 --text "..."');
+  if (!id) throw usage('用法：pcause snapshot <id> --file <path> 或 --text "..."');
   let text;
   if (flags.file) {
     const file = path.resolve(flags.file);
-    if (!fs.existsSync(file)) throw new Error('找不到文件：' + file);
+    throw new PcauseError('PCAUSE_NOT_FOUND', '找不到文件：' + file, '检查路径是否存在；Windows 路径含空格时请用引号包住');
     text = fs.readFileSync(file, 'utf8');
   } else if (typeof flags.text === 'string') {
     text = flags.text;
   } else {
-    throw new Error('缺少 --file 或 --text');
+    throw usage('缺少 --file 或 --text');
   }
   const p = savePrompt({ id, text, note: flags.note || '' });
   tick(`✔ 已保存快照 ${p.id}（${text.split('\n').length} 行）`);
@@ -317,7 +325,7 @@ function cmdList() {
 async function cmdRun(flags, pos) {
   requireInit();
   const id = pos[0];
-  if (!id || !flags.probes) throw new Error('用法：pcause run <id> --probes <file>');
+  if (!id) throw usage('用法：pcause run <id> --probes <file>');
   const prompt = getPrompt(id);
   const probes = readProbes(flags.probes, { limit: num(flags.limit, 0) });
   const { makeProvider } = await import('./providers.mjs');
@@ -353,7 +361,7 @@ async function cmdRun(flags, pos) {
 function cmdReport(flags, pos) {
   requireInit();
   const id = pos[0];
-  if (!id) throw new Error('用法：pcause report <attrId>');
+  if (!id) throw usage('用法：pcause report <attrId>');
   const attr = getAttribution(id);
   const { mdPath, htmlPath } = writeReports(attr, flags);
   tick(`✔ 已生成报告`);
@@ -365,7 +373,7 @@ function cmdReport(flags, pos) {
 function cmdCompare(flags, pos) {
   requireInit();
   const [aId, bId] = pos;
-  if (!aId || !bId) throw new Error('用法：pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]');
+  if (!aId || !bId) throw usage('用法：pcause compare <attrA> <attrB> [--allow-incompatible] [--json] [--md out.md]');
   const a = getAttribution(aId);
   const b = getAttribution(bId);
   let result;
@@ -373,7 +381,7 @@ function cmdCompare(flags, pos) {
     result = compareAttributions(a, b, { allowIncompatible: flags['allow-incompatible'] === true });
   } catch (err) {
     if (err.code === 'PCAUSE_SIGNATURE') {
-      console.error('✖ ' + err.message);
+      console.error(formatError(err));
       return 1;
     }
     throw err;
@@ -412,7 +420,7 @@ function cmdCompare(flags, pos) {
 
 function cmdSchema(flags) {
   const file = path.join(PKG_ROOT, 'schema', 'attribution.schema.json');
-  if (!fs.existsSync(file)) throw new Error('schema 文件缺失：' + file);
+  throw new PcauseError('PCAUSE_NOT_FOUND', 'schema 文件缺失：' + file, '重新 clone 仓库或运行 npm test 检查安装完整性');
   if (typeof flags.out === 'string') {
     const out = path.resolve(flags.out);
     fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -469,7 +477,7 @@ async function main() {
       console.log(HELP);
       return 0;
     default:
-      console.error(`未知命令：${cmd}\n`);
+      console.error(formatError(new PcauseError('PCAUSE_UNKNOWN_COMMAND', `未知命令：${cmd}`, '运行 pcause help 查看可用命令')) + '\n');
       console.log(HELP);
       return 1;
   }
@@ -478,6 +486,6 @@ async function main() {
 main()
   .then((code) => process.exit(code || 0))
   .catch((err) => {
-    console.error('✖ ' + err.message);
-    process.exit(1);
+    console.error(formatError(err));
+    process.exit(EXIT_CODES.ERROR);
   });

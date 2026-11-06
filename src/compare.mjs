@@ -6,6 +6,7 @@
 // 签名 = 探针集合 + 每探针采样次数 + 生成器(名称/模型/温度) + 判定器(名称/模型) + 复核器 + 归因对象类型。
 
 import { VERDICT_LABEL } from './attribute.mjs';
+import { PcauseError } from './errors.mjs';
 
 export const VERDICT_RANK = { unmeasured: 0, inert: 1, partial: 2, decisive: 3 };
 
@@ -118,7 +119,7 @@ function sameEffect(x, y) {
  * @param {object} opts { allowIncompatible }
  */
 export function compareAttributions(a, b, { allowIncompatible = false } = {}) {
-  if (!a || !b) throw new Error('compare 需要两份归因结果');
+  if (!a || !b) throw new PcauseError('PCAUSE_USAGE', 'compare 需要两份归因结果', '用法：pcause compare <attrA> <attrB>，先用 pcause list 查看已有 id');
   const mismatches = compareSignatures(a, b);
   if (mismatches.length && !allowIncompatible) {
     const err = new Error(

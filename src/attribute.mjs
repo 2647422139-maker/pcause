@@ -9,6 +9,7 @@
 //   校正后影响 = max(0, (c - w) / (1 - w))
 
 import { diffHunks, revertHunk, describeHunk } from './diff.mjs';
+import { PcauseError, usage } from './errors.mjs';
 import { getPrompt, readProbes, saveAttribution, newId } from './store.mjs';
 import { makeProvider } from './providers.mjs';
 import { makeJudge, JUDGE_BATCH_SIZE } from './judge.mjs';
@@ -105,8 +106,8 @@ export async function attribute(opts, ctx = {}) {
   const t0 = Date.now();
 
   const kind = opts.kind || 'prompt';
-  if (!KINDS.includes(kind)) throw new Error(`未知归因对象类型：${kind}（可选 ${KINDS.join(' / ')}）`);
-  if (!KIND_CONFIDENCE[kind]) throw new Error(`未知归因对象类型：${kind}`);
+  if (!KINDS.includes(kind)) throw new PcauseError('PCAUSE_KIND', `未知归因对象类型：${kind}（可选 ${KINDS.join(' / ')}）`, 'kind 描述提示词在系统中的位置（prompt/system/agent），不是输出业务标签');
+  if (!KIND_CONFIDENCE[kind]) throw new PcauseError('PCAUSE_KIND', `未知归因对象类型：${kind}`);
 
   const oldP = getPrompt(opts.old);
   const newP = getPrompt(opts.new);
@@ -115,11 +116,11 @@ export async function attribute(opts, ctx = {}) {
     onDegrade: (n, m) =>
       log(`⚠ 提示词较长（${n} / ${m} 行），diff 已退化为整段替换，无法逐块归因；结论粒度会变粗`),
   });
-  if (!hunks.length) throw new Error(`「${opts.old}」与「${opts.new}」没有差异，无需归因`);
+  if (!hunks.length) throw new PcauseError('PCAUSE_NO_DIFF', `「${opts.old}」与「${opts.new}」没有差异，无需归因`, '这是正常结果而非失败：两份提示词逐行相同，没有可消融的改动');
   const samples = Math.max(1, Math.floor(Number(opts.samples ?? opts.repeats ?? 1) || 1));
   const earlyStop = Boolean(opts.earlyStop);
   if (earlyStop && samples < 2) {
-    throw new Error('--early-stop 需要 --samples ≥ 2（先测 2 次才谈得上「是否补采样」）');
+    throw usage('--early-stop 需要 --samples ≥ 2（先测 2 次才谈得上「是否补采样」）', '去掉 --early-stop，或把 --samples 设为 ≥2（min-samples 还会再下调首轮采样数）');
   }
   const minSamples = minSamplesOf({ earlyStop, minSamples: opts.minSamples }, samples);
   const maxCalls = opts.maxCalls || 400;

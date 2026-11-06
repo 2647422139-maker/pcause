@@ -2,6 +2,20 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.9.0] - 2026-11-07
+
+### Added
+
+- 统一错误出口 `src/errors.mjs`：所有运行错误带稳定错误码（`PCAUSE_USAGE` / `PCAUSE_NOT_INIT` / `PCAUSE_NOT_FOUND` / `PCAUSE_INPUT` / `PCAUSE_KIND` / `PCAUSE_NO_DIFF` / `PCAUSE_PLUGIN` / `PCAUSE_ENV` / `PCAUSE_REQUEST` / `PCAUSE_EMPTY_OUTPUT` / `PCAUSE_INTERNAL` / `PCAUSE_UNKNOWN_COMMAND`）。
+- 报错默认两行：「✖ [码] 一句话原因」+「提示：下一步怎么做」，只写 stderr，stdout 与 `--json` 不受影响；`PCAUSE_DEBUG=1` 才追加堆栈。
+- README「错误码与自助排查」表、`--help` 的诊断与环境变量说明。
+- 自测新增结构化错误检查（153 项）。
+
+### Changed
+
+- 退出码语义保持 0 / 1 / 2 不变；门禁命中（退出码 2）不进入错误码体系。
+- `--provider` 未知时报 `PCAUSE_PLUGIN` 并列出内置通道与已配置插件。
+
 ## [0.8.0] - 2026-11-07
 
 ### Added

@@ -5,6 +5,7 @@
 //   cache/<sha>.json       模型输出缓存（避免重复花钱）
 
 import fs from 'node:fs';
+import { PcauseError, usage, notFound } from './errors.mjs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -56,7 +57,7 @@ function safeId(id) {
 
 // ---------- 提示词快照 ----------
 export function savePrompt({ id, text, note = '' }) {
-  if (!id) throw new Error('快照需要 id');
+  if (!id) throw usage('快照需要 id：pcause snapshot <id> --file <path>');
   const data = { id: safeId(id), text: String(text), note, createdAt: new Date().toISOString() };
   writeJSON(path.join(paths().prompts, data.id + '.json'), data);
   return data;
@@ -64,7 +65,7 @@ export function savePrompt({ id, text, note = '' }) {
 
 export function getPrompt(id) {
   const file = path.join(paths().prompts, safeId(id) + '.json');
-  if (!fs.existsSync(file)) throw new Error(`找不到提示词快照「${id}」（先 pcause snapshot ${id} --file ...）`);
+  if (!fs.existsSync(file)) throw notFound('提示词快照', id, `先运行 pcause snapshot ${id} --file <path> 记录它`);
   return readJSON(file);
 }
 
@@ -88,7 +89,7 @@ export function saveRun(run) {
 
 export function getRun(id) {
   const file = path.join(paths().runs, safeId(id) + '.json');
-  if (!fs.existsSync(file)) throw new Error(`找不到运行记录「${id}」`);
+  if (!fs.existsSync(file)) throw notFound('运行记录', id);
   return readJSON(file);
 }
 
@@ -102,7 +103,7 @@ export function saveAttribution(attr) {
 
 export function getAttribution(id) {
   const file = path.join(paths().attributions, safeId(id) + '.json');
-  if (!fs.existsSync(file)) throw new Error(`找不到归因结果「${id}」`);
+  if (!fs.existsSync(file)) throw notFound('归因结果', id, '运行 pcause list 查看已保存的归因结果 id');
   return readJSON(file);
 }
 
@@ -139,12 +140,12 @@ export function newId(prefix) {
 
 // ---------- 探针文件 ----------
 export function readProbes(file, { limit = 0, warn = () => {} } = {}) {
-  if (!fs.existsSync(file)) throw new Error(`找不到探针文件：${file}`);
+  if (!fs.existsSync(file)) throw new PcauseError('PCAUSE_NOT_FOUND', `找不到探针文件：${file}`, '探针文件支持 .json 数组、.jsonl 或纯文本一行一个输入；检查路径与拼写');
   const raw = fs.readFileSync(file, 'utf8');
   const probes = [];
   if (/\.json$/i.test(file)) {
     const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) throw new Error('探针 JSON 应为数组 [{id,input}]');
+    if (!Array.isArray(arr)) throw new PcauseError('PCAUSE_INPUT', '探针 JSON 应为数组 [{id,input}]', '例：[{"id":"p1","input":"..."}]；或改用 .jsonl 一行一个对象');
     for (const p of arr) probes.push({ id: String(p.id ?? 'p' + (probes.length + 1)), input: String(p.input ?? '') });
   } else {
     const isJsonl = /\.jsonl$/i.test(file);
@@ -158,14 +159,16 @@ export function readProbes(file, { limit = 0, warn = () => {} } = {}) {
         // .jsonl 写错一行就明确报错，避免把残缺 JSON 静默当成探针输入；
         // 其它扩展名视为「一行一个输入」的极简格式。
         if (isJsonl) {
-          throw new Error(
-            `探针文件 ${file} 第 ${lineNo} 行不是合法 JSON（.jsonl 要求一行一个 {"id","input"} 对象）：${line.slice(0, 120)}`
+          throw new PcauseError(
+            'PCAUSE_INPUT',
+            `探针文件 ${file} 第 ${lineNo} 行不是合法 JSON（.jsonl 要求一行一个 {"id","input"} 对象）：${line.slice(0, 120)}`,
+            '删除或修正该行；若想用「一行一个纯文本输入」，请把扩展名改为 .txt'
           );
         }
         probes.push({ id: 'p' + (idx + 1), input: line });
       }
     });
   }
-  if (!probes.length) throw new Error('探针文件里没有有效探针');
+  if (!probes.length) throw new PcauseError('PCAUSE_INPUT', '探针文件里没有有效探针', '确认文件非空、每行是合法 JSON 或纯文本输入（// 开头的行会被忽略）');
   return limit > 0 ? probes.slice(0, limit) : probes;
 }
