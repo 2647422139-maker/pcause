@@ -3,7 +3,18 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-153%2F153%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-162%2F162%20passing-brightgreen)
+
+## v1.10 更新摘要
+
+发布前自检（`npm run preflight`）：把「对外可见的信任点」一次性校验掉，避免发版时 README / 版本 / CHANGELOG 互相打架。
+
+- **版本一致性**：`package.json` 版本 = CHANGELOG 最新**已发布**条目（正确跳过 `[Unreleased]`），并检查 CHANGELOG 覆盖初始版本。
+- **badge 不说谎**：默认真跑一遍离线自测，把 README 里的 `selftest-N/N` 和实际通过数逐字比对；同时扫描 README 里残留的旧总数（防止更新时漏改）。
+- **链接不悬空**：README 的本地链接目标必须存在；带 `#锚点` 的 Markdown 链接会用 GitHub 风格 slug 校验标题真实存在（HTTP 外链不做联网检查，保持离线）。
+- **承诺文件齐全**：`docs/demo-*`、`schema/`、`examples/`、`LICENSE` 等 README 里承诺存在的文件必须都在；`package.json` 的 `files` 白名单必须覆盖 `src/schema/examples/docs`；`bin` 入口能跑 `version` / `help`。
+- 用法：`npm run preflight`（默认含自测，约数秒）；`node scripts/preflight.mjs --no-tests --quiet` 只做静态检查。失败时逐项列出原因并退出码 1。
+- 自测 **162/162**（新增 9 项：版本解析跳过 Unreleased、badge 两种写法解析、自测输出解析、本地链接提取、标题 slug、本仓库 preflight 通过）。
 
 ## v1.9 更新摘要
 
@@ -12,7 +23,7 @@
 - **统一错误出口** `src/errors.mjs`：所有运行错误带稳定错误码，例如 `PCAUSE_NOT_FOUND`（文件/快照/归因不存在）、`PCAUSE_INPUT`（探针文件格式错）、`PCAUSE_KIND`（`--kind` 拼错）、`PCAUSE_NO_DIFF`（两份提示词没差异——这是正常结果，明确说明）、`PCAUSE_PLUGIN`（未知 provider）、`PCAUSE_ENV`（缺 Key / 找不到豆包桥接）、`PCAUSE_REQUEST`（模型请求失败，多半可重试）、`PCAUSE_EMPTY_OUTPUT`（思考模型把预算用光）、`PCAUSE_INTERNAL`（内部不一致，建议反馈）、`PCAUSE_UNKNOWN_COMMAND`。
 - **报错只写 stderr、stdout 零污染**：默认输出「✖ [PCAUSE_xxx] 一句话原因」+「提示：下一步怎么做」；`--json` 输出的 stdout 仍然可以直接 `JSON.parse`。
 - **调试开关**：`PCAUSE_DEBUG=1` 才追加堆栈（默认隐藏内部细节）；`--help` 新增「出错时的诊断」与 `PCAUSE_CONFIG` / `PCAUSE_DEBUG` 说明。
-- 自测 **153/153**（新增 12 项：码格式、堆栈开关、未初始化 / 缺探针 / 未知 provider / 无差异 / 未知命令的码与退出码、stdout 不被污染、help 披露调试开关）。
+- 自测 **153/153**（新增 12 项：码格式、堆栈开关、未初始化 / 缺探针 / 未知 provider / 无差异 / 未知命令的码与退出码、stdout 不被污染、help 披露调试开关；v1.10 起为 162/162）。
 
 ```text
 ✖ [PCAUSE_NOT_FOUND] 找不到探针文件：nope.jsonl
@@ -171,7 +182,8 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 153/153 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 162/162 项离线自测，不联网、不花钱
+npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
 版本变更历史见 [CHANGELOG.md](CHANGELOG.md)。发布包只包含 `src/`、`schema/`、`examples/`、`docs/` 与文档（见 `package.json` 的 `files` 白名单），本地 `.pcause/` 工作区不会被一起发布。
@@ -260,6 +272,28 @@ echo $?   # 0 无命中；2 命中门禁；1 运行错误
 | `PCAUSE_UNKNOWN_COMMAND` | 未知子命令 | `pcause help` |
 
 排错开关：`PCAUSE_DEBUG=1` 追加堆栈；`PCAUSE_CONFIG` 指定插件配置；`PCAUSE_HOME` 指定工作区。门禁命中（`--fail-on`，退出码 2）属于业务阻断，不进入错误码体系。
+
+## 4.2 发布前自检（v1.10）
+
+`npm run preflight` 把「发版时最容易互相打架的对外信息」一次性校验掉，适合发版前或 CI 里跑：
+
+| 检查 | 说明 |
+| --- | --- |
+| 版本一致 | `package.json` 版本 = CHANGELOG 最新**已发布**条目（跳过 `[Unreleased]`），且 CHANGELOG 覆盖 0.1.0 |
+| badge 不撒谎 | 默认真的跑一遍离线自测，README 的 `selftest-N/N` 必须等于实际通过数 |
+| 无残留旧数字 | README 里不能还留着 141/141 这类过期总数 |
+| 本地链接与锚点 | 链接目标文件必须存在；`#标题` 锚点用 GitHub 风格 slug 校验目标标题真实存在 |
+| 承诺文件齐全 | README 引用的 `docs/demo-*`、`schema/`、`examples/`、`LICENSE` 必须都在 |
+| 发布白名单 | `package.json` 的 `files` 覆盖 `src/schema/examples/docs` |
+| 入口可用 | `bin` 指向的文件存在，且 `pcause version` / `pcause help` 能跑通 |
+
+```bash
+npm run preflight                                  # 全量（含自测，数秒）
+node scripts/preflight.mjs --no-tests --quiet      # 只做静态检查，适合极快的本地预检
+echo $?                                            # 0 全部通过；1 有检查未通过
+```
+
+输出逐项 `✓/✗`，失败时列出具体原因（哪个链接缺失、badge 差多少、哪个版本对不上），不做任何联网检查。
 
 ## 5. 命令
 

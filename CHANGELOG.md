@@ -2,6 +2,18 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.10.0] - 2026-11-07
+
+### Added
+
+- 发布前自检脚本 `scripts/preflight.mjs`（`npm run preflight`）：一次校验版本三方一致（`package.json` ↔ CHANGELOG 最新已发布条目）、CHANGELOG 无未发布段、README selftest badge 与**真实跑出来的**自测数量一致、README 本地链接与标题锚点有效、演示 / 示例文件齐全、`files` 白名单覆盖、`bin` 入口存在且 `version` / `help` 可运行。
+  - 默认真的跑一遍离线自测来核对 badge 数字（`--no-tests` 跳过、`--quiet` 静默），适合放进发版 checklist 或 CI。
+- `package.json` 增加 `preflight` 脚本；自测新增发布前自检检查（162 项）。
+
+### Changed
+
+- 版本升到 0.10.0。
+
 ## [0.9.0] - 2026-11-07
 
 ### Added

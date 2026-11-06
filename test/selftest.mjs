@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.9.0', '版本号升到 0.9.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.10.0', '版本号升到 0.10.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.9.0'), 'CLI 版本号与 package.json 同步（0.9.0）');
+check(String(cliVersion.stdout).includes('0.10.0'), 'CLI 版本号与 package.json 同步（0.10.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -642,6 +642,24 @@ try {
 }
 check(rPureJson.status === 0 && !!pureJson && !rPureJson.stdout.includes('计划：'), '错误体系不污染 stdout（--json 仍可解析）');
 check(String(runRaw(['help']).stdout).includes('PCAUSE_DEBUG'), 'help 说明 PCAUSE_DEBUG 调试开关');
+
+console.log('\n[20/20] v1.10：发布前自检（scripts/preflight.mjs）');
+const pf = await import('../scripts/preflight.mjs');
+check(pf.firstChangelogVersion('## [Unreleased]\n\n## [1.2.3] - 2026\n') === '1.2.3', 'CHANGELOG 最新版本跳过 [Unreleased]');
+check(pf.firstChangelogVersion('## [0.9.0]\n## [0.8.0]\n') === '0.9.0', 'CHANGELOG 取最新已发布版本（不被旧条目误判）');
+check(pf.firstChangelogVersion('没有版本标题') === null, '无版本标题时返回 null');
+check(pf.badgeCounts('![t](https://img.shields.io/badge/selftest-153%2F153%20passing)')?.total === 153, '解析 badge 的 %2F 写法');
+check(pf.badgeCounts('![t](https://img.shields.io/badge/selftest-12/12)')?.passed === 12, '解析 badge 的 / 写法');
+check(pf.selftestCounts('✔ 153/153 项通过')?.passed === 153, '解析自测输出的通过数');
+const pfLinks = pf.localLinks('[a](docs/x.md#标题) [b](https://x.y) [c](#local) [d](CHANGELOG.md)');
+check(pfLinks.length === 2 && pfLinks[0].file === 'docs/x.md' && pfLinks[0].anchor === '标题', '本地链接提取：排除 http 与纯锚点、保留锚点');
+check(pf.slugify('4.1 出错时怎么办：错误码与自助排查（v1.9）') === '41-出错时怎么办错误码与自助排查v19', 'GitHub 风格标题 slug 可用于锚点校验');
+const pfRun = spawnSync(process.execPath, [path.join(PKG_ROOT, 'scripts', 'preflight.mjs'), '--no-tests', '--quiet'], {
+  env: process.env,
+  encoding: 'utf8',
+  cwd: PKG_ROOT,
+});
+check(pfRun.status === 0, '对当前仓库运行 preflight --no-tests 全部通过');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
