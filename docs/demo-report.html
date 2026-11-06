@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>提示词归因报告 · attr-20261106170034-d13c</title>
+<title>提示词归因报告 · attr-20261106173129-ba24</title>
 <style>
   :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --fg:#e6e8ee; --muted:#98a0b3;
     --line:#2a2f3a; --accent:#7aa2ff; --good:#3ecf8e; --warn:#f0b429; --bad:#ff6b6b; }
@@ -18,10 +18,14 @@
   .card.warn { border-color: rgba(240,180,41,.5); color: var(--warn); }
   .card .k { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
   .card .v { font-size:17px; margin-top:4px; word-break:break-all; }
+  .card .note { color:var(--muted); font-size:12.5px; margin-top:6px; }
+  .caveats { list-style:none; padding:0; margin:0; display:grid; gap:8px; }
+  .caveats li { background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px; padding:9px 12px; font-size:13.5px; color:#c8cfdd; }
   table { width:100%; border-collapse: collapse; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
   th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
   th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
   tr:last-child td { border-bottom:none; }
+  tr.row-off td { opacity:.62; }
   code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size:12.5px; }
   .mono { display:inline-block; max-width: 420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
   .muted { color: var(--muted); }
@@ -29,11 +33,13 @@
   .tag.decisive { background: rgba(255,107,107,.15); color: var(--bad); }
   .tag.partial { background: rgba(240,180,41,.15); color: var(--warn); }
   .tag.inert { background: rgba(62,207,142,.14); color: var(--good); }
+  .tag.unmeasured { background: rgba(152,160,179,.16); color: var(--muted); }
   .bar { display:inline-block; width:80px; height:8px; background:var(--line); border-radius:4px; margin-right:8px; vertical-align:middle; overflow:hidden; }
   .bar span { display:block; height:100%; background:var(--accent); }
   section { margin-top:34px; }
   h2 { font-size:17px; margin: 0 0 14px; }
   details { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin-bottom:12px; }
+  details.off { opacity:.8; }
   summary { cursor:pointer; font-weight:600; }
   .diff { margin:12px 0; padding:10px 12px; background:#0b0d11; border-radius:8px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; }
   .diff .add { color: var(--good); }
@@ -43,27 +49,33 @@
   .yes { color: var(--bad); font-weight:600; }
   .no { color: var(--good); font-weight:600; }
   .io { background:#0b0d11; border-radius:8px; padding:10px 12px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; white-space:pre-wrap; }
+  .warnbox { margin-top:10px; color:var(--warn); font-size:13px; }
   .foot { color:var(--muted); font-size:12px; margin-top:40px; }
 </style>
 </head>
 <body>
 <main>
   <h1>提示词归因报告</h1>
-  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106170034-d13c · 2026-11-06 17:00:34</div>
-  <div class="meta">
+  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106173129-ba24 · 2026-11-06 17:31:29</div>
+  <section>
+    <h2>阅读须知（固定三条）</h2>
+    <ul class="caveats"><li>假设：本分析假设各改动块（hunk）近似独立，不检测改动与改动之间的交互效应。</li><li>约束：结论高度依赖探针集合、判定器与采样随机噪声；判定器本身也可能出错。</li><li>泛化：归因对象类型不同（提示词 / 系统提示 / Agent 指令），上述假设的可信度不同。</li></ul>
+  </section>
+  <div class="meta" style="margin-top:22px">
     <div class="card"><div class="k">新版本 / 对照</div><div class="v">triage-v2 ← triage-v1</div></div>
+    <div class="card"><div class="k">归因对象</div><div class="v">用户提示词</div><div class="note">假设可信度：中等</div></div>
     <div class="card"><div class="k">生成模型</div><div class="v">deepseek / deepseek-flash</div></div>
     <div class="card"><div class="k">判定器</div><div class="v">deepseek + doubao</div></div>
     <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">3 / 2 / 3</div></div>
     <div class="card"><div class="k">噪声地板</div><div class="v">0%</div></div>
-    <div class="card"><div class="k">调用 / 耗时</div><div class="v">24 次 · 52.5s</div></div>
+    <div class="card"><div class="k">调用 / 耗时</div><div class="v">24 次 · 0.0s</div></div>
   </div>
   
   <section>
     <h2>结论排行</h2>
     <table>
-      <thead><tr><th>改动块</th><th>内容</th><th>类型</th><th>影响探针</th><th>校正后影响</th><th>原始</th><th>判定</th><th>第二意见</th></tr></thead>
-      <tbody><tr>
+      <thead><tr><th>改动块</th><th>内容</th><th>类型</th><th>影响探针</th><th>校正后影响</th><th>原始</th><th>判定</th><th>第二意见</th><th>备注</th></tr></thead>
+      <tbody><tr class="">
       <td><code>h2</code></td>
       <td class="mono">+ 最终只输出一个 JSON 对象：{"category": "&lt;类别名&gt;"}，不要输出其他内容。</td>
       <td>added</td>
@@ -72,8 +84,9 @@
       <td class="muted">100%</td>
       <td><span class="tag decisive">决定性</span></td>
       <td>12/12</td>
+      <td class="muted"></td>
     </tr>
-<tr>
+<tr class="">
       <td><code>h1</code></td>
       <td class="mono">+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。</td>
       <td>added</td>
@@ -82,8 +95,9 @@
       <td class="muted">33%</td>
       <td><span class="tag partial">部分影响</span></td>
       <td>12/12</td>
+      <td class="muted"></td>
     </tr>
-<tr>
+<tr class="">
       <td><code>h3</code></td>
       <td class="mono">+ 注意：本分类器是内部工具，输出会进入数据看板。</td>
       <td>added</td>
@@ -92,13 +106,15 @@
       <td class="muted">0%</td>
       <td><span class="tag inert">无影响</span></td>
       <td>—</td>
+      <td class="muted"></td>
     </tr></tbody>
     </table>
   </section>
   <section>
     <h2>建议</h2>
     <div class="card" style="white-space:pre-wrap">- 保留并重点维护：h1（部分影响，校正后影响 33%）、h2（决定性，校正后影响 100%）
-- 可安全删除（校正后无可测影响）：h3</div>
+- 可安全删除（校正后无可测影响）：h3
+- 「部分影响」只表示在部分探针上观测到行为变化，不表示该改动是坏改动；门禁只是信号门，不是质量门。</div>
   </section>
   <section>
     <h2>逐块证据</h2>
@@ -172,7 +188,7 @@ OTHER</div>
           </div>
       </details>
   </section>
-  <div class="foot">由 pcause 生成 · 反事实消融 + 噪声校正 + 异构模型判定 · 判定器可能出错，决定性结论建议人工复核</div>
+  <div class="foot">由 pcause 生成 · 反事实消融 + 噪声校正 + 异构模型判定 · 判定器可能出错，决定性结论建议人工复核。本分析不检测改动交互效应，结论不构成严格因果证明。</div>
 </main>
 </body>
 </html>

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.0",
+  "id": "attr-20261106173129-ba24",
+  "createdAt": "2026-11-06T17:31:29.327Z",
+  "kind": "prompt",
+  "kindLabel": "用户提示词",
+  "confidence": {
+    "level": "medium",
+    "label": "中等",
+    "note": "普通提示词的独立改动块之间耦合较少，hunk 独立性假设相对最好。"
+  },
+  "caveats": [
+    "假设：本分析假设各改动块（hunk）近似独立，不检测改动与改动之间的交互效应。",
+    "约束：结论高度依赖探针集合、判定器与采样随机噪声；判定器本身也可能出错。",
+    "泛化：归因对象类型不同（提示词 / 系统提示 / Agent 指令），上述假设的可信度不同。"
+  ],
+  "experiment": {
+    "oldId": "triage-v1",
+    "newId": "triage-v2",
+    "probes": 3,
+    "samples": 2,
+    "provider": {
+      "name": "deepseek",
+      "model": "deepseek-flash",
+      "temperature": 0
+    },
+    "judge": {
+      "name": "deepseek",
+      "model": "deepseek-flash"
+    },
+    "verify": {
+      "name": "doubao",
+      "model": "doubao-desktop"
+    },
+    "maxCalls": 100,
+    "calls": 24,
+    "cacheHits": 24,
+    "elapsedMs": 26,
+    "dryRun": false
+  },
+  "noise": {
+    "floor": 0,
+    "perProbe": [
+      0,
+      0,
+      0
+    ],
+    "adjusted": true,
+    "unreliableProbes": []
+  },
+  "lowConfidence": false,
+  "lowConfidenceReason": null,
+  "hunks": [
+    {
+      "id": "h1",
+      "type": "added",
+      "summary": "+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。",
+      "status": "partial",
+      "effect": 0.3333333333333333,
+      "rawEffect": 0.3333333333333333,
+      "changedProbes": 1,
+      "probeCount": 3,
+      "samplingInsufficient": false,
+      "unreliableProbes": [],
+      "verification": {
+        "judge": "doubao",
+        "model": "doubao-desktop",
+        "agree": 12,
+        "total": 12,
+        "fallback": false
+      },
+      "verificationSkipped": false
+    },
+    {
+      "id": "h2",
+      "type": "added",
+      "summary": "+ 最终只输出一个 JSON 对象：{\"category\": \"<类别名>\"}，不要输出其他内容。",
+      "status": "decisive",
+      "effect": 1,
+      "rawEffect": 1,
+      "changedProbes": 3,
+      "probeCount": 3,
+      "samplingInsufficient": false,
+      "unreliableProbes": [],
+      "verification": {
+        "judge": "doubao",
+        "model": "doubao-desktop",
+        "agree": 12,
+        "total": 12,
+        "fallback": false
+      },
+      "verificationSkipped": false
+    },
+    {
+      "id": "h3",
+      "type": "added",
+      "summary": "+ 注意：本分类器是内部工具，输出会进入数据看板。",
+      "status": "inert",
+      "effect": 0,
+      "rawEffect": 0,
+      "changedProbes": 0,
+      "probeCount": 3,
+      "samplingInsufficient": false,
+      "unreliableProbes": [],
+      "verification": null,
+      "verificationSkipped": false
+    }
+  ],
+  "summary": {
+    "hunks": 3,
+    "decisive": 1,
+    "partial": 1,
+    "inert": 1,
+    "unmeasured": 0,
+    "samplingInsufficient": 0
+  },
+  "extensions": {}
+}

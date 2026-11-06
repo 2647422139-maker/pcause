@@ -1,15 +1,19 @@
-// 离线自测：不花钱、不联网，验证 diff / 回退 / 归因 / 报告 / 存储 全链路
+// 离线自测：不花钱、不联网，验证 diff / 回退 / 归因 / 报告 / 存储 / 预算 / 门禁 全链路
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pcause-selftest-'));
 process.env.PCAUSE_HOME = path.join(tmpRoot, '.pcause');
+const PKG_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const { initStore, savePrompt, getPrompt } = await import('../src/store.mjs');
 const { diffHunks, revertHunk } = await import('../src/diff.mjs');
 const { attribute } = await import('../src/attribute.mjs');
 const { buildMarkdown, buildHtml } = await import('../src/report.mjs');
+const { toPublicJSON, validatePublicJSON, CAVEATS } = await import('../src/schema.mjs');
 
 let passed = 0;
 const failures = [];
@@ -153,6 +157,84 @@ try {
   badJsonlRejected = true;
 }
 check(badJsonlRejected, '.jsonl 里有非法 JSON 行时报错而不是静默当成探针');
+
+console.log('\n[9/11] v1.1：归因对象类型与固定免责声明');
+const attrSystem = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 2, maxCalls: 100, kind: 'system' },
+  { log: () => {} }
+);
+check(attrSystem.kind === 'system', 'kind 会写进归因结果');
+const pubSystem = toPublicJSON(attrSystem);
+check(pubSystem.confidence.level === 'low', '系统提示的假设可信度标记为「较低」');
+check(pubSystem.caveats.length === 3 && pubSystem.caveats[0] === CAVEATS[0], '对外 JSON 携带固定三条免责');
+const mdSystem = buildMarkdown(attrSystem);
+check(mdSystem.includes('阅读须知（固定三条）'), 'Markdown 报告含阅读须知');
+check(mdSystem.includes('系统提示'), 'Markdown 报告标注归因对象类型');
+check(buildHtml(attrSystem).includes('阅读须知（固定三条）'), 'HTML 报告含阅读须知');
+let badKindRejected = false;
+try {
+  await attribute({ old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', kind: 'nope' }, { log: () => {} });
+} catch {
+  badKindRejected = true;
+}
+check(badKindRejected, '未知 --kind 被拒绝');
+
+console.log('\n[10/11] v1.1：dry-run 预演、预算截断与 schema');
+const dry = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'deepseek', verify: 'doubao', samples: 2, maxCalls: 100 },
+  { log: () => {}, dryRun: true }
+);
+check(dry.dryRun === true, 'dry-run 返回预演结果');
+check(dry.plan.plannedCalls > 0 && dry.plan.generationCalls === 2 * 2 * 4, 'dry-run 正确预估生成调用数');
+check(dry.plan.judgeCalls > 0 && dry.plan.verifyCallsMax > 0, 'dry-run 把判定器与复核调用计入预估');
+check(dry.plan.fitsBudget === true, '预算充足时 dry-run 标记可运行');
+const dryTight = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', maxCalls: 2 },
+  { log: () => {}, dryRun: true }
+);
+check(dryTight.plan.fitsBudget === false, '预算过小时 dry-run 明确提示超出');
+
+const attrBudget = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 1, maxCalls: 5 },
+  { log: () => {} }
+);
+check(attrBudget.samplingInsufficient === true, '预算耗尽时标记采样不足而不是静默丢弃');
+check(attrBudget.hunks.some((h) => h.verdict === 'unmeasured' && h.effect === null), '未测完的改动块状态为 unmeasured');
+check(attrBudget.lowConfidence === true, '采样不足触发低置信度');
+const pubBudget = toPublicJSON(attrBudget);
+check(pubBudget.summary.unmeasured >= 1 && pubBudget.summary.samplingInsufficient >= 1, 'JSON 汇总区分 unmeasured 与采样不足');
+check(validatePublicJSON(pubBudget).length === 0, '预算截断的结果同样符合对外 schema');
+check(buildMarkdown(attrBudget).includes('未测量'), '报告把未测完的块标为未测量');
+check(buildMarkdown(attrBudget).includes('不是「无影响」'), '报告明确提醒「采样不足 ≠ 无影响」');
+
+const schemaFile = path.join(PKG_ROOT, 'schema', 'attribution.schema.json');
+check(fs.existsSync(schemaFile) && JSON.parse(fs.readFileSync(schemaFile, 'utf8')).$schema.includes('draft-07'), '仓库内置对外 JSON Schema');
+const pubAttr = toPublicJSON(attr2);
+check(validatePublicJSON(pubAttr).length === 0, '正常归因结果符合对外 schema');
+check(pubAttr.extensions && Object.keys(pubAttr.extensions).length === 0, '核心 JSON 的扩展槽为空对象（插件数据唯一出口）');
+check(pubAttr.schemaVersion === '1.0', '对外 JSON 带 schemaVersion');
+
+console.log('\n[11/11] v1.1：CLI 门禁与机器输出');
+const cliArgs = ['attribute', '--old', 'v1', '--new', 'v2', '--probes', probesFile, '--provider', 'mock', '--judge', 'heuristic', '--max-calls', '100'];
+const runCli = (extra) => spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), ...cliArgs, ...extra], {
+  env: process.env,
+  encoding: 'utf8',
+});
+const rJson = runCli(['--json']);
+check(rJson.status === 0, '--json 正常退出（0）');
+let cliJson = null;
+try {
+  cliJson = JSON.parse(rJson.stdout);
+} catch {
+  cliJson = null;
+}
+check(!!cliJson && validatePublicJSON(cliJson).length === 0, '--json 输出严格符合 schema');
+const rFailDecisive = runCli(['--fail-on', 'decisive']);
+check(rFailDecisive.status === 2, '--fail-on decisive 命中时退出码为 2');
+const rNone = runCli([]);
+check(rNone.status === 0, '未开 --fail-on 时退出码为 0');
+const rDry = runCli(['--dry-run']);
+check(rDry.status === 0 && rDry.stdout.includes('预演'), 'CLI --dry-run 只预演不运行');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

@@ -11,6 +11,7 @@ import {
 import { diffHunks, describeHunk } from './diff.mjs';
 import { attribute, VERDICT_LABEL } from './attribute.mjs';
 import { buildMarkdown, buildHtml } from './report.mjs';
+import { KINDS, toPublicJSON, validatePublicJSON } from './schema.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = path.resolve(HERE, '..');
@@ -27,20 +28,26 @@ const HELP = `pcause —— 提示词因果归因器
   pcause attribute --old <id> --new <id> --probes <file> [选项]
                                                  跑一次归因实验（核心命令）
   pcause report <attrId> [--md out.md] [--html out.html]
+  pcause schema [--out file]                     导出机器可读结果的 JSON Schema
   pcause selftest                                离线自测
 
-通用选项：
+attribute 选项：
   --provider mock|deepseek|doubao   生成模型（默认 deepseek）
   --model <name>                    模型名（deepseek 默认 deepseek-flash）
   --judge heuristic|deepseek|doubao 判定器（默认 heuristic）
   --verify <judge>                  用第二个模型做第二意见复核，如 --verify doubao
+  --kind prompt|system|agent        归因对象类型（默认 prompt；影响报告里的假设可信度提示）
   --samples <n>                     每个探针独立生成 n 次（默认 1；≥2 时自动测噪声地板并做校正，推荐 2~3）
   --repeats <n>                     --samples 的旧别名
   --temperature <n>                 采样温度（默认 0，保证可复现）
   --limit <n>                       只用前 n 个探针
-  --max-calls <n>                   调用预算保护（默认 300）
-  --repeats <n>                     同提示词重复跑 n 次以测噪声地板（默认 1）
-  --json                            机器可读输出
+  --max-calls <n>                   模型调用预算（默认 400，含判定器调用；预算不足的块标记「采样不足」）
+  --dry-run                         只预估调用量与预算是否够，不发起任何请求、不读 API Key
+  --fail-on decisive|partial        CI 门禁：命中则退出码 2（采样不足的块不参与门禁）
+  --json                            输出符合 schema/attribution.schema.json 的完整 JSON
+  --json-out <file>                 同时把这份 JSON 写到文件
+
+退出码：0 成功且未命中门禁；1 运行错误；2 命中 --fail-on 门禁（成功跑完，业务阻断）。
 
 环境变量：
   DEEPSEEK_API_KEY    DeepSeek API Key（也可放在 ~/.dsh/.credentials.yaml）
@@ -103,6 +110,12 @@ async function cmdAttribute(flags) {
   if (!oldId || !newId || !probesFile) {
     throw new Error('用法：pcause attribute --old <id> --new <id> --probes <file>');
   }
+  const kind = flags.kind || 'prompt';
+  if (!KINDS.includes(kind)) throw new Error(`未知 --kind：${kind}（可选 ${KINDS.join(' / ')}）`);
+  const failOn = flags['fail-on'];
+  if (failOn !== undefined && failOn !== 'decisive' && failOn !== 'partial') {
+    throw new Error('--fail-on 只接受 decisive 或 partial');
+  }
   const opts = {
     old: oldId,
     new: newId,
@@ -118,28 +131,73 @@ async function cmdAttribute(flags) {
     maxCalls: num(flags['max-calls'], 400),
     samples: num(flags.samples, num(flags.repeats, 1)),
     cache: flags.cache !== 'false',
+    kind,
   };
   const log = flags.json ? () => {} : (msg) => console.error('· ' + msg);
+
+  // --dry-run：只预估调用量，不发起任何模型请求
+  if (flags['dry-run']) {
+    const plan = await attribute(opts, { log, dryRun: true });
+    if (flags.json) {
+      console.log(JSON.stringify({ ok: true, dryRun: true, kind: plan.kind, plan: plan.plan, hunks: plan.hunks }, null, 2));
+      return 0;
+    }
+    tick(`\n预演（未发起任何模型请求）：${plan.hunks.length} 个改动块 × ${plan.plan.probes} 个探针 × 每探针 ${plan.plan.samples} 次采样`);
+    tick(
+      `  预计调用：生成 ${plan.plan.generationCalls} + 判定 ${plan.plan.judgeCalls} + 复核上限 ${plan.plan.verifyCallsMax} = ${plan.plan.plannedCalls} 次（预算 ${plan.plan.maxCalls}）`
+    );
+    if (!plan.plan.fitsBudget) {
+      tick('  ⚠ 预估调用数超过预算：正式运行会在预算耗尽处提前结束，并把未测完的改动块标记为「采样不足」');
+    }
+    tick('');
+    for (const h of plan.hunks) tick(`  ${h.id}  ${h.summary}`);
+    return 0;
+  }
+
   const attr = await attribute(opts, { log });
+  const pub = toPublicJSON(attr);
+  const schemaErrs = validatePublicJSON(pub);
+  if (schemaErrs.length) {
+    throw new Error('内部结果不符合对外 schema（这是 bug，请反馈）：\n  - ' + schemaErrs.join('\n  - '));
+  }
   const { mdPath, htmlPath } = writeReports(attr, flags);
+  if (typeof flags['json-out'] === 'string') {
+    const outFile = path.resolve(flags['json-out']);
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    fs.writeFileSync(outFile, JSON.stringify(pub, null, 2) + '\n', 'utf8');
+    if (!flags.json) tick(`\nJSON：${outFile}`);
+  }
+
+  const gateHits = failOn
+    ? attr.hunks.filter(
+        (h) =>
+          !h.samplingInsufficient &&
+          (failOn === 'decisive' ? h.verdict === 'decisive' : h.verdict === 'partial' || h.verdict === 'decisive')
+      )
+    : [];
+  const gateMsg = gateHits.length
+    ? `✖ 门禁命中（--fail-on ${failOn}）：${gateHits.map((h) => `${h.hunk.id}(${VERDICT_LABEL[h.verdict]})`).join('、')}`
+    : '';
 
   if (flags.json) {
-    console.log(JSON.stringify({ ok: true, id: attr.id, report: mdPath, html: htmlPath, summary: summarize(attr) }, null, 2));
-    return 0;
+    console.log(JSON.stringify(pub, null, 2));
+    if (gateMsg) console.error(gateMsg + '，退出码 2');
+    return gateHits.length ? 2 : 0;
   }
   tick(`\n✔ 归因完成：${attr.id}（${attr.calls} 次调用 / ${(attr.elapsedMs / 1000).toFixed(1)}s，缓存命中 ${attr.cacheHits}）`);
   tick(
-    `  噪声地板：${attr.noiseFloor == null ? '未测（--samples 2 可测）' : (attr.noiseFloor * 100).toFixed(0) + '%'}　采样：${attr.samples} 次/探针`
+    `  噪声地板：${attr.noiseFloor == null ? '未测（--samples 2 可测）' : (attr.noiseFloor * 100).toFixed(0) + '%'}　采样：${attr.samples} 次/探针　归因对象：${attr.kind}`
   );
   if (attr.lowConfidence) tick(`  ⚠ ${attr.lowConfidenceReason}`);
   tick('');
-  const order = { decisive: 0, partial: 1, inert: 2 };
-  for (const h of [...attr.hunks].sort((a, b) => order[a.verdict] - order[b.verdict] || b.effect - a.effect)) {
-    const bar = (h.verdict === 'decisive' ? '■' : h.verdict === 'partial' ? '▨' : '□').padEnd(2);
+  const order = { decisive: 0, partial: 1, inert: 2, unmeasured: 3 };
+  for (const h of [...attr.hunks].sort((a, b) => order[a.verdict] - order[b.verdict] || (b.effect ?? -1) - (a.effect ?? -1))) {
+    const bar = (h.verdict === 'decisive' ? '■' : h.verdict === 'partial' ? '▨' : h.verdict === 'inert' ? '□' : '·').padEnd(2);
     tick(
-      `  ${bar} ${h.hunk.id}  ${VERDICT_LABEL[h.verdict].padEnd(4)}  ${String(Math.round(h.effect * 100)).padStart(3)}%` +
-        `（原始 ${String(Math.round(h.rawEffect * 100)).padStart(3)}%）  ${h.hunk.summary}`
+      `  ${bar} ${h.hunk.id}  ${VERDICT_LABEL[h.verdict].padEnd(4)}  ${h.effect == null ? '   —' : String(Math.round(h.effect * 100)).padStart(3) + '%'}` +
+        `（原始 ${h.rawEffect == null ? '—' : String(Math.round(h.rawEffect * 100)).padStart(3) + '%'}）  ${h.hunk.summary}`
     );
+    if (h.samplingInsufficient) tick('        └ 预算不足，采样不足：该块没有结论（不是「无影响」）');
     if (h.verification) {
       tick(
         `        └ 第二意见（${h.verification.judge}）：判定一致 ${h.verification.agree}/${h.verification.total}` +
@@ -150,19 +208,11 @@ async function cmdAttribute(flags) {
   tick('');
   tick(`报告：${mdPath}`);
   tick(`      ${htmlPath}`);
+  if (gateMsg) {
+    tick(gateMsg + '，退出码 2');
+    return 2;
+  }
   return 0;
-}
-
-function summarize(attr) {
-  return attr.hunks.map((h) => ({
-    hunk: h.hunk.id,
-    type: h.hunk.type,
-    summary: h.hunk.summary,
-    effect: h.effect,
-    rawEffect: h.rawEffect,
-    verdict: h.verdict,
-    verified: h.verification ? { agree: h.verification.agree, total: h.verification.total } : null,
-  }));
 }
 
 function cmdDiff(flags, pos) {
@@ -263,6 +313,20 @@ function cmdReport(flags, pos) {
   return 0;
 }
 
+function cmdSchema(flags) {
+  const file = path.join(PKG_ROOT, 'schema', 'attribution.schema.json');
+  if (!fs.existsSync(file)) throw new Error('schema 文件缺失：' + file);
+  if (typeof flags.out === 'string') {
+    const out = path.resolve(flags.out);
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.copyFileSync(file, out);
+    tick(`✔ 已导出 JSON Schema：${out}`);
+  } else {
+    tick(fs.readFileSync(file, 'utf8'));
+  }
+  return 0;
+}
+
 function cmdSelftest() {
   const script = path.join(PKG_ROOT, 'test', 'selftest.mjs');
   const r = spawnSync(process.execPath, [script], { stdio: 'inherit' });
@@ -291,10 +355,12 @@ async function main() {
       return cmdAttribute(flags);
     case 'report':
       return cmdReport(flags, pos);
+    case 'schema':
+      return cmdSchema(flags);
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.1.0');
+      tick('pcause 0.2.0');
       return 0;
     case 'help':
     case '--help':

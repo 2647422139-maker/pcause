@@ -1,7 +1,7 @@
 {
   "name": "pcause",
-  "version": "0.1.0",
-  "description": "Prompt 因果归因器：用反事实消融实验测出提示词改动里哪一块真正改变了模型行为",
+  "version": "0.2.0",
+  "description": "Prompt 因果归因器：用反事实消融实验测出提示词改动里哪一块真正改变了模型行为（含噪声校正、预算护栏、CI 门禁与稳定 JSON schema）",
   "type": "module",
   "bin": {
     "pcause": "./src/cli.mjs"

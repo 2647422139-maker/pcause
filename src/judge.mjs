@@ -3,6 +3,9 @@
 
 import { makeProvider } from './providers.mjs';
 
+// 一次判定请求里放多少组输出对；--dry-run 的调用量预估依赖这个常量。
+export const JUDGE_BATCH_SIZE = 6;
+
 const JUDGE_SYSTEM = `你是严格的「输出行为差异」判定员。用户会给你若干组输出对：A 是使用新提示词得到的输出，B 是把新提示词中某一处改动回退后得到的输出。你要判断每一对之间是否存在实质性的行为差异。
 
 判定 changed=true 的标准（满足任意一项即可）：
@@ -92,7 +95,7 @@ export function makeJudge(name, opts = {}) {
     name,
     model: provider.model,
     stats: provider.stats,
-    async judgeBatch(pairs, { batchSize = 6 } = {}) {
+    async judgeBatch(pairs, { batchSize = JUDGE_BATCH_SIZE } = {}) {
       const results = [];
       for (let offset = 0; offset < pairs.length; offset += batchSize) {
         const batch = pairs.slice(offset, offset + batchSize);

@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/2647422139-maker/pcause/schema/attribution.schema.json",
+  "title": "pcause attribution result",
+  "description": "稳定机器可读结果的核心契约（v1.0，冻结）。CI、对比工具只应依赖本 schema 中的核心字段；插件/自定义扩展数据只能放在 extensions 下，核心字段不得被插件污染。",
+  "type": "object",
+  "required": [
+    "schemaVersion", "id", "createdAt", "kind", "kindLabel", "confidence", "caveats",
+    "experiment", "noise", "lowConfidence", "lowConfidenceReason", "hunks", "summary", "extensions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": ["string", "null"] },
+    "kind": { "enum": ["prompt", "system", "agent"] },
+    "kindLabel": { "type": "string" },
+    "confidence": {
+      "type": "object",
+      "required": ["level", "label", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "level": { "enum": ["low", "medium"] },
+        "label": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "caveats": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "string" } },
+    "experiment": {
+      "type": "object",
+      "required": ["oldId", "newId", "probes", "samples", "provider", "judge", "maxCalls", "calls", "cacheHits", "elapsedMs", "dryRun"],
+      "additionalProperties": false,
+      "properties": {
+        "oldId": { "type": "string" },
+        "newId": { "type": "string" },
+        "probes": { "type": "integer", "minimum": 1 },
+        "samples": { "type": "integer", "minimum": 1 },
+        "provider": {
+          "type": "object",
+          "required": ["name", "model"],
+          "properties": { "name": { "type": "string" }, "model": { "type": "string" }, "temperature": { "type": "number" } }
+        },
+        "judge": {
+          "type": "object",
+          "required": ["name"],
+          "properties": { "name": { "type": "string" }, "model": { "type": "string" } }
+        },
+        "verify": {
+          "type": ["object", "null"],
+          "properties": { "name": { "type": "string" }, "model": { "type": "string" } }
+        },
+        "maxCalls": { "type": ["integer", "null"], "minimum": 1 },
+        "calls": { "type": "integer", "minimum": 0 },
+        "cacheHits": { "type": "integer", "minimum": 0 },
+        "elapsedMs": { "type": "number", "minimum": 0 },
+        "dryRun": { "type": "boolean" }
+      }
+    },
+    "noise": {
+      "type": "object",
+      "required": ["floor", "perProbe", "adjusted", "unreliableProbes"],
+      "additionalProperties": false,
+      "properties": {
+        "floor": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "perProbe": { "type": ["array", "null"], "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+        "adjusted": { "type": "boolean" },
+        "unreliableProbes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "lowConfidence": { "type": "boolean" },
+    "lowConfidenceReason": { "type": ["string", "null"] },
+    "hunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "type", "summary", "status", "effect", "rawEffect", "changedProbes",
+          "probeCount", "samplingInsufficient", "unreliableProbes", "verification", "verificationSkipped"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "summary": { "type": "string" },
+          "status": { "enum": ["decisive", "partial", "inert", "unmeasured"] },
+          "effect": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "rawEffect": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "changedProbes": { "type": "integer", "minimum": 0 },
+          "probeCount": { "type": "integer", "minimum": 1 },
+          "samplingInsufficient": { "type": "boolean" },
+          "unreliableProbes": { "type": "array", "items": { "type": "string" } },
+          "verification": {
+            "type": ["object", "null"],
+            "required": ["judge", "model", "agree", "total", "fallback"],
+            "properties": {
+              "judge": { "type": "string" },
+              "model": { "type": "string" },
+              "agree": { "type": "integer", "minimum": 0 },
+              "total": { "type": "integer", "minimum": 0 },
+              "fallback": { "type": "boolean" }
+            }
+          },
+          "verificationSkipped": { "type": "boolean" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["hunks", "decisive", "partial", "inert", "unmeasured", "samplingInsufficient"],
+      "additionalProperties": false,
+      "properties": {
+        "hunks": { "type": "integer", "minimum": 0 },
+        "decisive": { "type": "integer", "minimum": 0 },
+        "partial": { "type": "integer", "minimum": 0 },
+        "inert": { "type": "integer", "minimum": 0 },
+        "unmeasured": { "type": "integer", "minimum": 0 },
+        "samplingInsufficient": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "estimates": {
+      "type": "object",
+      "description": "仅 --dry-run 的 JSON 输出包含此字段",
+      "properties": {
+        "probes": { "type": "integer", "minimum": 1 },
+        "hunks": { "type": "integer", "minimum": 1 },
+        "samples": { "type": "integer", "minimum": 1 },
+        "generationCalls": { "type": "integer", "minimum": 0 },
+        "judgeCalls": { "type": "integer", "minimum": 0 },
+        "verifyCallsMax": { "type": "integer", "minimum": 0 },
+        "plannedCalls": { "type": "integer", "minimum": 0 },
+        "maxCalls": { "type": "integer", "minimum": 1 },
+        "fitsBudget": { "type": "boolean" },
+        "note": { "type": "string" }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "插件与自定义扩展的唯一出口：键为插件 id，核心渲染/门禁/对比逻辑永不读取此字段。"
+    }
+  }
+}
