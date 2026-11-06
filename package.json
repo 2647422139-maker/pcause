@@ -1,6 +1,6 @@
 {
   "name": "pcause",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Prompt 因果归因器：用反事实消融实验测出提示词改动里哪一块真正改变了模型行为（噪声校正、自适应采样、结论迁移对比、插件通道、system/agent 判定维度、预算护栏、CI 门禁与稳定 JSON schema）",
   "type": "module",
   "bin": {
@@ -10,7 +10,8 @@
     "test": "node test/selftest.mjs",
     "preflight": "node scripts/preflight.mjs",
     "demo": "node src/cli.mjs attribute --old triage-v1 --new triage-v2 --probes examples/probes.jsonl --provider deepseek --model deepseek-flash --judge deepseek --verify doubao --samples 3 --min-samples 2 --early-stop --concurrency 4",
-    "pack-check": "node scripts/pack-check.mjs"
+    "pack-check": "node scripts/pack-check.mjs",
+    "release:check": "node scripts/release-check.mjs"
   },
   "engines": {
     "node": ">=20"

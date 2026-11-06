@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.16.0', '版本号升到 0.16.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.17.0', '版本号升到 0.17.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.16.0'), 'CLI 版本号与 package.json 同步（0.16.0）');
+check(String(cliVersion.stdout).includes('0.17.0'), 'CLI 版本号与 package.json 同步（0.17.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -764,6 +764,27 @@ check(demoOut && demoOut.workspace.includes('pcause-demo-'), 'demo 把产物写�
 check(demoOut && fs.existsSync(demoOut.mdPath) && fs.existsSync(demoOut.htmlPath), 'demo 真的生成 Markdown 与 HTML 报告文件');
 const rDemoText = runRaw(['demo'], { ...process.env, PCAUSE_HOME: path.join(tmpRoot, 'demo-外面不存在的工作区2') });
 check(rDemoText.status === 0 && String(rDemoText.stdout).includes('归因完成') && String(rDemoText.stdout).includes('不联网'), '不带 --json 时 demo 打印人类可读摘要与下一步提示');
+
+console.log('\n[26/26] v1.17：发布前检查 scripts/release-check.mjs（npm publish 前的自动化部分）');
+const rc = await import('../scripts/release-check.mjs');
+check(rc.parseGitStatus('').clean === true, 'git 状态解析：空输出 = 干净');
+const dirty = rc.parseGitStatus(' M src/cli.mjs\n?? new-file.mjs\n');
+check(dirty.clean === false && dirty.files.length === 2, 'git 状态解析：未提交改动能被识别');
+check(rc.checkAuthResult({ status: 0, stdout: 'alice\n' }).ok && rc.checkAuthResult({ status: 0, stdout: 'alice\n' }).user === 'alice', 'npm 登录状态解析：已登录时给出用户名');
+check(rc.checkAuthResult({ status: 1, stderr: 'need auth' }).ok === false, 'npm 登录状态解析：未登录不算硬失败');
+const steps = rc.manualSteps('9.9.9');
+check(steps.length === 5 && steps.some((s) => s.includes('npm publish --access public')) && steps.some((s) => s.includes('v9.9.9')) && steps.some((s) => s.includes('npx pcause@latest demo')), '人工发布步骤包含 publish / 装包验证 / 打标签，且版本号已代入');
+const rr = rc.releaseCheck({ offline: true, skipTests: true, skipPack: true, log: () => {} });
+check(rr.checks.some((c) => c.name.includes('发布元数据') && c.ok) && rr.checks.some((c) => c.name.includes('bin 入口') && c.ok), 'release-check：发布元数据与 bin 入口检查通过');
+check(rr.checks.some((c) => c.warn && c.name.includes('跳过网络')) && rr.manualSteps.length === 5, 'release-check --offline：明确提示跳过网络检查，并给出人工步骤');
+const relCli = runRaw(['help'], { ...process.env }); // 占位：确保 CLI 仍可用
+const rRelease = spawnSync(process.execPath, [path.join(PKG_ROOT, 'scripts', 'release-check.mjs'), '--offline', '--skip-tests', '--skip-pack', '--json'], { encoding: 'utf8', env: process.env });
+let releaseJson = null;
+try {
+  releaseJson = JSON.parse(String(rRelease.stdout).split('\n').filter((l) => l.trim().startsWith('{')).pop() || '');
+} catch {}
+check(releaseJson && Array.isArray(releaseJson.manualSteps) && releaseJson.checks.length >= 6, 'CLI --json 输出可解析且含 checks/manualSteps');
+check(Boolean(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).scripts['release:check']), 'package.json 暴露 npm run release:check');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

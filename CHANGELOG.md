@@ -2,6 +2,19 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.17.0] - 2026-11-07
+
+### Added
+
+- 新增 `scripts/release-check.mjs`（`npm run release:check`）：发布到 npm 之前自动化可检查的部分。
+  - 发布元数据：`name` / `version`（semver）/ `bin.pcause` 入口存在且 shebang 合法 / `files` 白名单 / `type=module` / `engines.node` / `license`；`repository`/`homepage`/`bugs` 缺失只警告。
+  - 版本与仓库状态：工作区干净、当前提交已推送 `origin/main`、`v<version>` 标签尚未创建。
+  - 产物与一致性：`npm pack --dry-run` 清单必含/禁含、`preflight`、`pack-check`；联网时额外检查 npm 登录状态（未登录只警告）与 registry 上是否已存在该版本。
+  - 通过后打印 5 步人工发布清单（`npm login` → `npm publish --access public` → `npm view` 核对 → 空目录 `npx pcause@latest demo` → 打标签并推送），并明确 `npm publish` 涉及登录与 2FA、必须人工执行。
+  - 支持 `--offline` / `--skip-tests` / `--skip-pack` / `--json`，退出码 0/1。
+- 新增 9 项自测（git 状态解析、登录状态解析、人工步骤版本代入、离线跳过网络、JSON 可解析等），总自测 221 项。
+- README 新增「4.4 发布到 npm」一节，说明为什么不能自动发布、以及首发高频坑（包名 404 不等于可注册、2FA 验证码、bin 名与大小写、registry 镜像缓存）。
+
 ## [0.16.0] - 2026-11-07
 
 ### Added

@@ -3,7 +3,16 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-212%2F212%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-221%2F221%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.17 更新摘要
+
+发布到 npm 之前，能自动检查的部分不再靠人肉清单。
+
+- 新增 `scripts/release-check.mjs`（`npm run release:check`）：一条命令跑完发布前的自动化检查——发布元数据（name/version/bin/files/type/engines/license）、bin 入口与 shebang、repository/homepage/bugs、工作区是否干净、当前提交是否已推送、`v<version>` 标签是否尚未占用、`npm pack --dry-run` 清单必含/禁含、preflight、pack-check，以及（联网时）npm 登录状态与 registry 上是否已存在该版本。
+- **边界要诚实**：`npm publish` 本身要登录与 2FA，脚本不会替你发布。它会打印 5 步人工清单：`npm login` → `npm publish --access public` → `npm view pcause version` 核对 → 空目录 `npx pcause@latest demo` 装包验证 → 打标签并推送。
+- 支持 `--offline`（跳过网络检查，CI/无网环境可跑）、`--skip-tests`、`--skip-pack`、`--json`；未登录 npm 只警告、不算失败——发布前检查不该因为「还没登录」就失败。
+- 新增 9 项自测（git 状态解析、登录状态解析、人工步骤版本代入、离线跳过网络、JSON 可解析等），共 **221/221 项**通过。
 
 ## v1.16 更新摘要
 
@@ -244,7 +253,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 212/212 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 221/221 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -393,9 +402,39 @@ npm test && node scripts/preflight.mjs --no-tests && npm run pack-check -- --qui
 ```bash
 npm run pack-check              # 10 项检查，几秒，产物自动清理
 node scripts/pack-check.mjs --keep   # 保留临时目录与 tgz，便于自己翻看
+npm run release:check           # 发布前检查（联网）：元数据/仓库状态/打包清单/preflight/pack-check/registry
+npm run release:check -- --offline  # 同上但跳过网络检查
+npm run release:check -- --json     # 机器可读输出
 ```
 
 本次演练实际抓到的问题：`files` 白名单漏了 `scripts/`，导致安装后 `npm run preflight` 报文件不存在；已修复并把 `scripts/` 加进白名单。包名可用性另行确认（`npm view pcause` 返回 404，未被占用）。
+
+## 4.4 发布到 npm（v1.17）
+
+`npm publish` 需要登录与 2FA，pcause 不会替你发布；但发布**之前**能自动检查的部分，一条命令跑完：
+
+```bash
+npm run release:check            # 联网：元数据 / bin / 工作区 / 推送状态 / tag / 打包清单 / preflight / pack-check / npm 登录 / registry 版本占用
+npm run release:check -- --offline   # 无网环境：跳过 npm 登录与 registry 检查
+```
+
+检查分三类，失败项逐条列出并退出码 1：
+
+| 类别 | 查什么 |
+| --- | --- |
+| 发布元数据 | `name` / `version`（semver）/ `bin.pcause` 指向的入口存在且有合法 shebang / `files` 白名单 / `type=module` / `engines.node` / `license`；缺 `repository`/`homepage`/`bugs` 只警告 |
+| 版本与仓库状态 | 工作区干净（`git status --porcelain` 为空）、当前提交已推送 `origin/main`、`v<version>` 标签尚未创建（避免重复发版） |
+| 产物与一致性 | `npm pack --dry-run` 的 tarball 必含/禁含清单、`preflight`（版本↔CHANGELOG↔badge↔链接↔文件）、`pack-check`（打包→独立目录安装→跑 bin）；联网时再看 npm 登录状态（未登录只警告）与 registry 上是否已有该版本（`npm view pcause versions`） |
+
+通过后脚本打印 5 步人工发布清单：
+
+1. `npm config get registry` 应为 `https://registry.npmjs.org/` → `npm login`（开了 2FA 时 `publish` 还需一次性验证码）
+2. `npm publish --access public`
+3. `npm view pcause version` 应等于 `package.json` 的版本
+4. 空目录 `npx pcause@latest demo`，确认装包后能跑通内置演示
+5. `git tag v<version> && git push origin v<version>`
+
+> 提示：`npm view <name>` 返回 404 只说明「当前 registry 上查不到」，不等于包名一定可注册（检索缓存有延迟）；真正能否发布以 `npm publish` 的结果为准。
 
 ## 5. 命令
 
@@ -497,7 +536,8 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  141 项离线自测
+├── test/selftest.mjs  221 项离线自测
+├── scripts/           发布前自检：preflight（版本/链接/文件一致性）、pack-check（安装演练）、release-check（发布检查单）
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 ├── CHANGELOG.md       版本变更历史（Keep a Changelog 轻量格式）
