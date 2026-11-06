@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.22.0', '版本号升到 0.22.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.23.0', '版本号升到 0.23.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.22.0'), 'CLI 版本号与 package.json 同步（0.22.0）');
+check(String(cliVersion.stdout).includes('0.23.0'), 'CLI 版本号与 package.json 同步（0.23.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.22.0', '任意 cwd 下 version 不依赖工作目录（0.22.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.23.0', '任意 cwd 下 version 不依赖工作目录（0.23.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -907,6 +907,18 @@ const cliSrcIssue = fs.readFileSync(path.join(PKG_ROOT, 'src', 'cli.mjs'), 'utf8
 check(cliSrcIssue.includes('flags.issue === true') && cliSrcIssue.includes('formatIssueReport'), 'CLI 里 doctor --issue 分支已接线');
 const docIssueSrc = fs.readFileSync(path.join(PKG_ROOT, 'src', 'doctor.mjs'), 'utf8');
 check(docIssueSrc.includes('export function formatIssueReport'), 'doctor.mjs 导出 formatIssueReport');
+
+// ===== [32/32] v1.23 compare 指南 =====
+const compareDoc = path.join(PKG_ROOT, 'docs', 'compare.md');
+const cdText = fs.existsSync(compareDoc) ? fs.readFileSync(compareDoc, 'utf8') : '';
+check(cdText.length > 2000, 'docs/compare.md 存在且有实质内容');
+check(cdText.includes('实验签名') && cdText.includes('探针集') && cdText.includes('--samples'), 'compare 指南解释签名组成与采样条件');
+check(cdText.includes('不变') && cdText.includes('升级') && cdText.includes('降级') && cdText.includes('新增') && cdText.includes('消失'), 'compare 指南列出五种迁移状态');
+check(cdText.includes('PCAUSE_SIGNATURE') && cdText.includes('--allow-incompatible'), 'compare 指南说明签名不一致时的拒绝与强制开关');
+check(cdText.includes('不重跑') && cdText.includes('unmeasured'), 'compare 指南说明不重跑模型与未测块语义');
+const readmeCompare = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readmeCompare.includes('docs/compare.md') && readmeCompare.includes('## 4.6'), 'README 有 4.6 章节并链接 compare 指南');
+check(fs.existsSync(path.join(PKG_ROOT, 'docs', 'compare-demo.md')) && cdText.includes('compare-demo.md'), 'compare 指南引用真实演示文件');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

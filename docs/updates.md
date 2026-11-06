@@ -3,6 +3,17 @@
 > 本文件收录 README 中移出的各版本更新摘要，按时间倒序。
 > 机器可读的版本变更见 [CHANGELOG.md](../CHANGELOG.md)；最新摘要见 [README](../README.md#更新日志)。
 
+## v1.23 更新摘要
+
+compare 是 pcause 的招牌能力之一，但此前只有一段演示和一行命令说明。v1.23 补上 `docs/compare.md`：
+
+- 实验签名包含哪些条件（探针集 / 采样 / Provider / Judge / kind），签名不一致为什么默认拒绝而不是「将就着比」。
+- 五种迁移状态：不变、升级、降级、新增、消失；按「内容键」对齐而不是按位置。
+- 如何读真实演示（docs/compare-demo.md）；verdict 相同不等于 effect 相同。
+- 五个坑：措辞变化变成「消失 + 新增」、compare 不重跑模型、unmeasured 不是无影响、CI 用 --json、实验条件不一致时先统一条件。
+
+总自测 273 项，preflight 13/13，安装演练 10/10。
+
 ## v1.22 更新摘要
 
 v1.19 有了 `pcause doctor`，但用户还要自己把输出整理成 issue 里该有的样子。v1.22 让它一步到位：

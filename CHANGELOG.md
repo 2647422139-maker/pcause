@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.23.0] - 2026-11-07
+
+### Added
+
+- 新增 `docs/compare.md`：compare 的完整指南——实验签名包含哪些条件、签名不一致为什么默认拒绝、五种迁移状态（不变/升级/降级/新增/消失）、如何读演示结果、五个常见坑（措辞变化→消失+新增、compare 不重跑模型、verdict 相同不代表 effect 相同、unmeasured 不是无影响、CI 用 --json）、以及放进工作流的三步示例。
+- README 新增「4.6 两次归因怎么比」并链接指南与真实对比演示；目录树同步。
+- 新增 7 项自测（指南体量、签名与采样说明、五种状态、签名拒绝与强制开关、不重跑与未测语义、README 章节与链接、演示文件引用），总自测 273 项。
+
 ## [0.22.0] - 2026-11-07
 
 ### Added
