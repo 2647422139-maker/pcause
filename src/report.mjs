@@ -88,6 +88,14 @@ export function buildMarkdown(attr) {
   lines.push(`| 判定器 | ${attr.judge.name}${attr.verify ? `（第二意见：${attr.verify.name}）` : ''} |`);
   lines.push(`| 探针数 | ${attr.probes.length} |`);
   lines.push(`| 每探针采样 | ${attr.samples} 次 |`);
+  lines.push(`| 采样策略 | ${attr.samplingPolicy || `固定采样：每探针每版本 ${attr.samples} 次`} |`);
+  if (attr.earlyStop) {
+    const early = attr.hunks.filter((h) => Number.isFinite(h.samplesUsed) && h.samplesUsed < attr.samples).map((h) => h.hunk.id);
+    const full = attr.hunks.filter((h) => h.extended).map((h) => h.hunk.id);
+    lines.push(
+      `| 采样披露 | 提前停止：${early.length ? `${early.join('、')}（各先测 ${attr.minSamples} 次）` : '无'}；补采样到 ${attr.samples} 次：${full.length ? full.join('、') : '无'}；停止判断只用原始变化率，噪声校正在采样决策之后 |`
+    );
+  }
   lines.push(`| 改动块（hunk） | ${attr.hunks.length} |`);
   lines.push(`| 噪声地板 | ${noiseText(attr)} |`);
   lines.push(`| 判定口径 | 校正后影响 ≥50% 决定性，≥20% 部分影响，否则无影响；预算不足的块标记「未测量」 |`);
@@ -116,7 +124,12 @@ export function buildMarkdown(attr) {
     const verify = h.verification
       ? `${h.verification.agree}/${h.verification.total}${h.verification.fallback ? ' ⚠回退' : ''}`
       : '—';
-    const note = h.samplingInsufficient ? '采样不足' : h.verificationSkipped ? '复核被跳过' : '';
+    const noteParts = [];
+    if (h.samplingInsufficient) noteParts.push('采样不足');
+    if (h.verificationSkipped) noteParts.push('复核被跳过');
+    if (attr.earlyStop && Number.isFinite(h.samplesUsed)) noteParts.push(`采样 ${h.samplesUsed}/${attr.samples}`);
+    if (h.extended) noteParts.push('自适应补采样');
+    const note = noteParts.join('；');
     lines.push(
       `| ${i + 1} | ${h.hunk.id} | ${h.hunk.type} | ${h.changedCount}/${attr.probes.length} | ${pct(h.effect)} | ${pct(h.rawEffect)} | ${VERDICT_LABEL[h.verdict]} | ${verify} | ${note} |`
     );
@@ -170,7 +183,11 @@ export function buildHtml(attr) {
       <td class="muted">${pct(h.rawEffect)}</td>
       <td><span class="tag ${h.verdict}">${VERDICT_LABEL[h.verdict]}</span></td>
       <td>${h.verification ? `${h.verification.agree}/${h.verification.total}${h.verification.fallback ? ' ⚠' : ''}` : '—'}</td>
-      <td class="muted">${h.samplingInsufficient ? '采样不足' : h.verificationSkipped ? '复核被跳过' : ''}</td>
+      <td class="muted">${[
+        h.samplingInsufficient ? '采样不足' : '',
+        h.verificationSkipped ? '复核被跳过' : '',
+        attr.earlyStop && Number.isFinite(h.samplesUsed) ? `采样 ${h.samplesUsed}/${attr.samples}${h.extended ? '（补采样）' : ''}` : '',
+      ].filter(Boolean).join('；')}</td>
     </tr>`
     )
     .join('\n');
@@ -283,7 +300,8 @@ export function buildHtml(attr) {
     <div class="card"><div class="k">归因对象</div><div class="v">${esc(KIND_LABEL[kind] || kind)}</div><div class="note">假设可信度：${esc(conf.label)}</div></div>
     <div class="card"><div class="k">生成模型</div><div class="v">${esc(attr.provider.name)} / ${esc(attr.provider.model)}</div></div>
     <div class="card"><div class="k">判定器</div><div class="v">${esc(attr.judge.name)}${attr.verify ? ' + ' + esc(attr.verify.name) : ''}</div></div>
-    <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">${attr.probes.length} / ${attr.samples} / ${attr.hunks.length}</div></div>
+    <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">${attr.probes.length} / ${attr.samples} / ${attr.hunks.length}</div>${attr.earlyStop ? `<div class="note">自适应：先测 ${attr.minSamples} 次</div>` : ''}</div>
+    ${attr.earlyStop ? `<div class="card"><div class="k">采样策略</div><div class="v">自适应（先测 ${attr.minSamples} 次）</div><div class="note">仅在结论含糊或噪声偏高时补到 ${attr.samples} 次</div></div>` : ''}
     <div class="card"><div class="k">噪声地板</div><div class="v">${attr.noiseFloor == null ? '未测' : pct(attr.noiseFloor)}</div></div>
     <div class="card"><div class="k">调用 / 耗时</div><div class="v">${attr.calls} 次 · ${(attr.elapsedMs / 1000).toFixed(1)}s</div></div>
   </div>

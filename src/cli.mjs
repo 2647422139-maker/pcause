@@ -41,6 +41,8 @@ attribute 选项：
   --verify <judge>                  用第二个模型做第二意见复核，如 --verify doubao
   --kind prompt|system|agent        归因对象类型（默认 prompt；影响报告里的假设可信度提示）
   --samples <n>                     每个探针独立生成 n 次（默认 1；≥2 时自动测噪声地板并做校正，推荐 2~3）
+  --early-stop                      采样提前停止：先测 --min-samples 次，仅在结论含糊/噪声偏高时补采样到 --samples
+  --min-samples <n>                 自适应采样的首轮次数（默认 2；需配合 --early-stop，且 ≤ --samples）
   --concurrency <n>                 生成阶段的并发请求数（默认 1；2~4 更快，过高易触发限流）
   --repeats <n>                     --samples 的旧别名
   --temperature <n>                 采样温度（默认 0，保证可复现）
@@ -140,6 +142,8 @@ async function cmdAttribute(flags) {
     limit: num(flags.limit, 0),
     maxCalls: num(flags['max-calls'], 400),
     samples: num(flags.samples, num(flags.repeats, 1)),
+    earlyStop: Boolean(flags['early-stop']),
+    minSamples: num(flags['min-samples'], 2),
     concurrency: num(flags.concurrency, 1),
     cache: flags.cache !== 'false',
     kind,
@@ -160,6 +164,11 @@ async function cmdAttribute(flags) {
     );
     if (!plan.plan.fitsBudget) {
       tick('  ⚠ 预估调用数超过预算：正式运行会在预算耗尽处提前结束，并把未测完的改动块标记为「采样不足」');
+    }
+    if (plan.plan.earlyStop) {
+      tick(
+        `  自适应采样：先测 ${plan.plan.minSamples} 次；调用量区间约 ${plan.plan.plannedCallsMin}（全部提前停止）～ ${plan.plan.plannedCalls}（全部补采样）`
+      );
     }
     tick(`  说明：${plan.plan.note}`);
     tick('');
@@ -199,7 +208,7 @@ async function cmdAttribute(flags) {
   }
   tick(`\n✔ 归因完成：${attr.id}（${attr.calls} 次调用 / ${(attr.elapsedMs / 1000).toFixed(1)}s，缓存命中 ${attr.cacheHits}）`);
   tick(
-    `  噪声地板：${attr.noiseFloor == null ? '未测（--samples 2 可测）' : (attr.noiseFloor * 100).toFixed(0) + '%'}　采样：${attr.samples} 次/探针　归因对象：${attr.kind}`
+    `  噪声地板：${attr.noiseFloor == null ? '未测（--samples 2 可测）' : (attr.noiseFloor * 100).toFixed(0) + '%'}　采样：${attr.samples} 次/探针（${attr.earlyStop ? `自适应，先 ${attr.minSamples} 次` : '固定'}）　归因对象：${attr.kind}`
   );
   if (attr.lowConfidence) tick(`  ⚠ ${attr.lowConfidenceReason}`);
   tick('');
@@ -211,6 +220,7 @@ async function cmdAttribute(flags) {
         `（原始 ${h.rawEffect == null ? '—' : String(Math.round(h.rawEffect * 100)).padStart(3) + '%'}）  ${h.hunk.summary}`
     );
     if (h.samplingInsufficient) tick('        └ 预算不足，采样不足：该块没有结论（不是「无影响」）');
+    if (h.extended) tick(`        └ 自适应采样：先测 ${attr.minSamples} 次后补采样到 ${h.samplesUsed} 次`);
     if (h.verification) {
       tick(
         `        └ 第二意见（${h.verification.judge}）：判定一致 ${h.verification.agree}/${h.verification.total}` +
@@ -429,7 +439,7 @@ async function main() {
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.5.0');
+      tick('pcause 0.6.0');
       return 0;
     case 'help':
     case '--help':

@@ -50,6 +50,8 @@ function toPublicHunk(h, probeCount) {
     rawEffect: h.rawEffect == null ? null : Number(h.rawEffect),
     changedProbes: h.changedCount ?? 0,
     probeCount,
+    samplesUsed: Number.isFinite(h.samplesUsed) ? h.samplesUsed : null,
+    extended: Boolean(h.extended),
     samplingInsufficient: Boolean(h.samplingInsufficient),
     unreliableProbes: h.unreliableProbes || [],
     verification: h.verification
@@ -95,6 +97,11 @@ export function toPublicJSON(attr, extra = {}) {
       newId: attr.newId,
       probes: attr.probes.length,
       samples: attr.samples,
+      sampling: {
+        policy: attr.earlyStop ? 'adaptive' : 'fixed',
+        minSamples: attr.minSamples ?? attr.samples,
+        samples: attr.samples,
+      },
       provider: attr.provider,
       judge: attr.judge,
       verify: attr.verify || null,
@@ -144,6 +151,11 @@ export function validatePublicJSON(obj) {
   req(isStr(e.oldId) && isStr(e.newId), 'experiment.oldId / newId 必须是字符串');
   req(isNum(e.probes) && e.probes > 0, 'experiment.probes 必须是正数');
   req(isNum(e.samples) && e.samples >= 1, 'experiment.samples 必须是 ≥1 的数');
+  if (e.sampling) {
+    req(['adaptive', 'fixed'].includes(e.sampling.policy), 'experiment.sampling.policy 必须是 adaptive / fixed');
+    req(isNum(e.sampling.minSamples) && e.sampling.minSamples >= 1, 'experiment.sampling.minSamples 必须是 ≥1 的数');
+    req(isNum(e.sampling.samples) && e.sampling.samples >= 1, 'experiment.sampling.samples 必须是 ≥1 的数');
+  }
   req(e.provider && isStr(e.provider.name), 'experiment.provider.name 缺失');
   req(e.judge && isStr(e.judge.name), 'experiment.judge.name 缺失');
   req(typeof e.dryRun === 'boolean', 'experiment.dryRun 必须是布尔值');
@@ -161,6 +173,10 @@ export function validatePublicJSON(obj) {
     req(h.effect === null || isNum(h.effect), `${where}.effect 必须是数字或 null`);
     req(h.rawEffect === null || isNum(h.rawEffect), `${where}.rawEffect 必须是数字或 null`);
     req(typeof h.samplingInsufficient === 'boolean', `${where}.samplingInsufficient 必须是布尔值`);
+    if (h.samplesUsed !== null && h.samplesUsed !== undefined) {
+      req(isNum(h.samplesUsed) && h.samplesUsed >= 0, `${where}.samplesUsed 必须是 ≥0 的数`);
+    }
+    if (h.extended !== undefined) req(typeof h.extended === 'boolean', `${where}.extended 必须是布尔值`);
     const s = h.status;
     if (s === 'unmeasured') {
       req(h.effect === null, `${where}: unmeasured 的 effect 必须为 null`);

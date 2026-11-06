@@ -14,6 +14,7 @@ import { makeProvider } from './providers.mjs';
 import { makeJudge, JUDGE_BATCH_SIZE } from './judge.mjs';
 import { mapLimit } from './concurrency.mjs';
 import { KINDS, KIND_CONFIDENCE, CAVEATS } from './schema.mjs';
+import { shouldExtendSampling, describeSamplingPolicy, AMBIGUOUS_LOW, AMBIGUOUS_HIGH, NOISE_EXTEND_THRESHOLD } from './sampling.mjs';
 
 export function verdictOf(effect) {
   if (effect >= 0.5) return 'decisive';
@@ -40,30 +41,56 @@ const isBudget = (err) => err && err.code === 'PCAUSE_BUDGET';
  * 供 --dry-run 与预算预检使用。verify 调用数因要等第一轮判定才知道是否触发，
  * 这里按「所有改动块都非无影响」取上限。
  */
+export function minSamplesOf(opts, samples) {
+  if (!opts.earlyStop) return samples;
+  const requested = Math.floor(Number(opts.minSamples ?? 2) || 2);
+  return Math.min(samples, Math.max(2, requested));
+}
+
 export function planCalls(opts, hunks, probes) {
   const samples = Math.max(1, Math.floor(Number(opts.samples ?? opts.repeats ?? 1) || 1));
+  const earlyStop = Boolean(opts.earlyStop) && samples >= 2;
+  const minSamples = minSamplesOf({ earlyStop, minSamples: opts.minSamples }, samples);
+  // 上限：所有改动块都补采样（全部满采样）；下限：所有改动块都提前停止（只有基线满采样）。
   const generationCalls = probes.length * samples * (1 + hunks.length);
+  const generationCallsMin = probes.length * samples + hunks.length * probes.length * minSamples;
   const noisePairs = probes.length * ((samples * (samples - 1)) / 2);
   const crossPairsPerHunk = probes.length * samples * samples;
+  const crossPairsPerHunkMin = probes.length * samples * minSamples;
   const judgeIsLlm = (opts.judge || 'heuristic') !== 'heuristic';
   const judgeCalls = judgeIsLlm
     ? Math.ceil(noisePairs / CALLS_PER_JUDGE_BATCH) + hunks.length * Math.ceil(crossPairsPerHunk / CALLS_PER_JUDGE_BATCH)
     : 0;
+  const judgeCallsMin = judgeIsLlm
+    ? Math.ceil(noisePairs / CALLS_PER_JUDGE_BATCH) + hunks.length * Math.ceil(crossPairsPerHunkMin / CALLS_PER_JUDGE_BATCH)
+    : 0;
   const verifyIsLlm = Boolean(opts.verify) && opts.verify !== 'heuristic';
   const verifyCallsMax = verifyIsLlm ? hunks.length * Math.ceil(crossPairsPerHunk / CALLS_PER_JUDGE_BATCH) : 0;
   const plannedCalls = generationCalls + judgeCalls + verifyCallsMax;
+  const plannedCallsMin = generationCallsMin + judgeCallsMin;
   const maxCalls = opts.maxCalls || 400;
+  const note =
+    '预估按「无缓存」计算，实际运行时命中缓存会更少；verify 调用按「所有改动块都非无影响」取上限。' +
+    (earlyStop
+      ? ` 自适应采样已开启：plannedCalls 为「全部补采样」上限，plannedCallsMin 为「全部提前停止」下限（阈值固定 ${AMBIGUOUS_LOW}~${AMBIGUOUS_HIGH}，噪声地板 ≥${NOISE_EXTEND_THRESHOLD} 才补采样）。`
+      : '');
   return {
     probes: probes.length,
     hunks: hunks.length,
     samples,
+    earlyStop,
+    minSamples,
+    samplingPolicy: describeSamplingPolicy({ earlyStop, samples, minSamples }),
     generationCalls,
+    generationCallsMin,
     judgeCalls,
+    judgeCallsMin,
     verifyCallsMax,
     plannedCalls,
+    plannedCallsMin,
     maxCalls,
     fitsBudget: plannedCalls <= maxCalls,
-    note: '预估按「无缓存」计算，实际运行时命中缓存会更少；verify 调用按「所有改动块都非无影响」取上限。',
+    note,
   };
 }
 
@@ -90,12 +117,20 @@ export async function attribute(opts, ctx = {}) {
   });
   if (!hunks.length) throw new Error(`「${opts.old}」与「${opts.new}」没有差异，无需归因`);
   const samples = Math.max(1, Math.floor(Number(opts.samples ?? opts.repeats ?? 1) || 1));
+  const earlyStop = Boolean(opts.earlyStop);
+  if (earlyStop && samples < 2) {
+    throw new Error('--early-stop 需要 --samples ≥ 2（先测 2 次才谈得上「是否补采样」）');
+  }
+  const minSamples = minSamplesOf({ earlyStop, minSamples: opts.minSamples }, samples);
   const maxCalls = opts.maxCalls || 400;
   // 有界并发只影响「生成阶段」的调度；预算仍是硬上限（发起前预占，见 callGen）。
   const concurrency = Math.max(1, Math.floor(Number(opts.concurrency || 1) || 1));
   if (concurrency > 1) {
     log(`并发：生成阶段最多 ${concurrency} 个请求同时在飞（结果顺序按探针 + 采样序号固定）`);
     if (concurrency > 8) log('  ⚠ 并发过高容易触发 API 限流；建议 2~4');
+  }
+  if (earlyStop) {
+    log(`采样策略：${describeSamplingPolicy({ earlyStop, samples, minSamples })}`);
   }
 
   // dry-run：只预估调用量，绝不发起任何模型请求（也不读取 API Key）。
@@ -106,6 +141,7 @@ export async function attribute(opts, ctx = {}) {
         `（生成 ${plan.generationCalls} + 判定 ${plan.judgeCalls} + 复核上限 ${plan.verifyCallsMax}），预算 ${maxCalls}`
     );
     if (!plan.fitsBudget) log(`  ⚠ 预估调用数超过预算；正式运行会在预算耗尽处提前结束，并标记「采样不足」`);
+    if (earlyStop) log(`  自适应采样：下限 ${plan.plannedCallsMin} 次（全部提前停止）～ 上限 ${plan.plannedCalls} 次（全部补采样）`);
     return { dryRun: true, plan, kind, hunks: hunks.map((h) => ({ id: h.id, summary: describeHunk(h) })) };
   }
 
@@ -191,6 +227,19 @@ export async function attribute(opts, ctx = {}) {
     }
   }
 
+  // 组间对比辅助：基线采样 × 某一版本的采样，构造全部配对并批量判定。
+  const judgeCross = async (varArr) => {
+    const entries = [];
+    varArr.forEach((arr, pi) => {
+      baselineSamples[pi].forEach((a, bi) => {
+        arr.forEach((b, vi) => entries.push({ a, b, probe: pi, baseIdx: bi, varIdx: vi }));
+      });
+    });
+    const verdicts = await judge.judgeBatch(entries.map((e) => ({ a: e.a, b: e.b })));
+    chargeJudges();
+    return { entries, judgements: verdicts };
+  };
+
   const variants = [];
   let samplingInsufficient = false;
   for (const hunk of hunks) {
@@ -199,7 +248,7 @@ export async function attribute(opts, ctx = {}) {
     let variantSamples;
     const promptText = revertHunk(newP.text, hunk);
     try {
-      variantSamples = await runOnProbes(promptText, samples, hunk.id + ' ');
+      variantSamples = await runOnProbes(promptText, minSamples, hunk.id + ' ');
     } catch (err) {
       if (!isBudget(err)) throw err;
       samplingInsufficient = true;
@@ -208,17 +257,9 @@ export async function attribute(opts, ctx = {}) {
       continue;
     }
 
-    // 组间对比：基线采样 × 回退后采样 的所有配对（逐探针）
-    const entries = [];
-    variantSamples.forEach((arr, pi) => {
-      baselineSamples[pi].forEach((a, bi) => {
-        arr.forEach((b, vi) => entries.push({ a, b, probe: pi, baseIdx: bi, varIdx: vi }));
-      });
-    });
-    let judgements;
+    let cross;
     try {
-      judgements = await judge.judgeBatch(entries.map((e) => ({ a: e.a, b: e.b })));
-      chargeJudges();
+      cross = await judgeCross(variantSamples);
     } catch (err) {
       if (!isBudget(err)) throw err;
       samplingInsufficient = true;
@@ -226,8 +267,30 @@ export async function attribute(opts, ctx = {}) {
       variants.push(unmeasuredVariant(hunk, label, probes));
       continue;
     }
-    const crossPerProbe = probes.map((_, pi) => rate(judgements.filter((_, k) => entries[k].probe === pi)));
-    const rawEffect = mean(crossPerProbe);
+    let { entries, judgements } = cross;
+    let crossPerProbe = probes.map((_, pi) => rate(judgements.filter((_, k) => entries[k].probe === pi)));
+    let rawEffect = mean(crossPerProbe);
+    let samplesUsed = minSamples;
+    let extended = false;
+
+    // 自适应补采样：只在「含糊」（原始变化率 10%~70%）或噪声偏高时补到 --samples 次。
+    // 决策只用未校正的原始变化率，噪声校正在采样决策之后进行（避免循环反馈）。
+    if (earlyStop && shouldExtendSampling({ rawEffect, noiseFloor, minSamples, maxSamples: samples })) {
+      const noiseText = noiseFloor == null ? '噪声未测' : `噪声地板 ${(noiseFloor * 100).toFixed(0)}%`;
+      log(`  ${hunk.id} 原始变化率 ${(rawEffect * 100).toFixed(0)}%、${noiseText} → 补采样到 ${samples} 次`);
+      try {
+        variantSamples = await runOnProbes(promptText, samples, hunk.id + ' 补采样');
+        cross = await judgeCross(variantSamples);
+        ({ entries, judgements } = cross);
+        crossPerProbe = probes.map((_, pi) => rate(judgements.filter((_, k) => entries[k].probe === pi)));
+        rawEffect = mean(crossPerProbe);
+        samplesUsed = samples;
+        extended = true;
+      } catch (err) {
+        if (!isBudget(err)) throw err;
+        log(`  ⚠ 预算不足以补采样，${hunk.id} 保留 ${samplesUsed} 次采样的结论（报告已标注）`);
+      }
+    }
 
     let effect = rawEffect;
     const unreliableProbes = [];
@@ -284,6 +347,8 @@ export async function attribute(opts, ctx = {}) {
       verificationSkipped: false,
       rawEffect,
       effect,
+      samplesUsed,
+      extended,
       verdict: verdictOf(effect),
     };
 
@@ -336,6 +401,9 @@ export async function attribute(opts, ctx = {}) {
     caveats: CAVEATS,
     probes,
     samples,
+    earlyStop,
+    minSamples,
+    samplingPolicy: describeSamplingPolicy({ earlyStop, samples, minSamples }),
     concurrency,
     maxCalls,
     newOutputs,
@@ -382,6 +450,8 @@ function unmeasuredVariant(hunk, label, probes) {
     verificationSkipped: true,
     rawEffect: null,
     effect: null,
+    samplesUsed: 0,
+    extended: false,
     verdict: 'unmeasured',
   };
 }

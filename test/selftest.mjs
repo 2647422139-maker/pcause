@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.5.0', '版本号升到 0.5.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.6.0', '版本号升到 0.6.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -455,6 +455,93 @@ try {
   pluginJson = null;
 }
 check(rPlugin.status === 0 && !!pluginJson && validatePublicJSON(pluginJson).length === 0, 'CLI --config 加载插件并输出合规 JSON');
+
+console.log('\n[15/15] v1.5：采样提前停止（自适应补采样）');
+const { shouldExtendSampling, describeSamplingPolicy } = await import('../src/sampling.mjs');
+const { planCalls } = await import('../src/attribute.mjs');
+
+check(
+  shouldExtendSampling({ rawEffect: 0.45, noiseFloor: 0, minSamples: 2, maxSamples: 3 }) === true,
+  '原始变化率落在含糊区间 → 需要补采样'
+);
+check(
+  shouldExtendSampling({ rawEffect: 0.0, noiseFloor: 0, minSamples: 2, maxSamples: 3 }) === false,
+  '原始变化率为 0（清晰无影响）→ 提前停止'
+);
+check(
+  shouldExtendSampling({ rawEffect: 1.0, noiseFloor: 0, minSamples: 2, maxSamples: 3 }) === false,
+  '原始变化率为 1（清晰决定性）→ 提前停止'
+);
+check(
+  shouldExtendSampling({ rawEffect: 1.0, noiseFloor: 0.2, minSamples: 2, maxSamples: 3 }) === true,
+  '噪声地板 ≥15% 时即使效应清晰也补采样'
+);
+check(
+  shouldExtendSampling({ rawEffect: 0.45, noiseFloor: 0, minSamples: 3, maxSamples: 3 }) === false,
+  'min 与 max 相同时不可能再补采样'
+);
+check(/自适应采样/.test(describeSamplingPolicy({ earlyStop: true, samples: 3, minSamples: 2 })), '策略说明包含自适应口径');
+check(/固定采样/.test(describeSamplingPolicy({ earlyStop: false, samples: 3, minSamples: 3 })), '策略说明包含固定采样口径');
+
+// mock provider 是确定性的：三处改动分别 决定性 / 决定性 / 无影响，均不该补采样。
+const attrFixed = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 3, cache: false, maxCalls: 200 },
+  { log: () => {} }
+);
+const attrEarly = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 3, earlyStop: true, minSamples: 2, cache: false, maxCalls: 200 },
+  { log: () => {} }
+);
+check(attrEarly.hunks.every((h) => h.samplesUsed === 2 && h.extended === false), '清晰结论的改动块提前停止（只用 2 次采样）');
+check(attrEarly.calls < attrFixed.calls, '提前停止确实省下生成调用');
+check(attrEarly.hunks.map((h) => h.verdict).join(',') === attrFixed.hunks.map((h) => h.verdict).join(','), '自适应采样不改变清晰块的判定');
+
+// 含糊区间：plugin provider 每次输出在 A/B 之间翻转，与提示词无关 → 原始变化率≈50%，应补采样。
+fs.writeFileSync(
+  path.join(tmpRoot, 'coin.mjs'),
+  'let n = 0;\nexport default function () {\n  return { name: "coin", model: "coin-v1", async generate() { return (n++ % 2 === 0) ? "A" : "B"; } };\n}\n'
+);
+fs.writeFileSync(
+  path.join(tmpRoot, 'exact.mjs'),
+  `export default function () { return { name: 'exact', async judgeBatch(pairs) { return pairs.map(({ a, b }) => ({ changed: String(a) !== String(b), reason: '内容不同' })); } }; }\n`
+);
+const coinCfg = writeCfg('coin.json', { provider: { coin: { module: './coin.mjs' } }, judge: { exact: { module: './exact.mjs' } } });
+const attrCoin = await attribute(
+  { old: 'v1', new: 'v2', probes: probesFile, provider: 'coin', judge: 'exact', config: coinCfg, samples: 3, earlyStop: true, minSamples: 2, cache: false, maxCalls: 200 },
+  { log: () => {} }
+);
+check(attrCoin.hunks.every((h) => h.extended === true && h.samplesUsed === 3), '含糊区间的块补采样到满采样');
+
+const pubAdapt = toPublicJSON(attrCoin);
+check(validatePublicJSON(pubAdapt).length === 0, '自适应采样结果仍符合对外 JSON schema');
+check(pubAdapt.experiment.sampling.policy === 'adaptive' && pubAdapt.experiment.sampling.minSamples === 2, 'schema 记录自适应策略');
+check(pubAdapt.hunks.every((h) => h.extended === true && h.samplesUsed === 3), 'schema 记录每块的采样次数与补采样标记');
+
+const mdAdapt = buildMarkdown(attrCoin);
+check(/采样策略/.test(mdAdapt) && /提前停止/.test(mdAdapt) && /补采样/.test(mdAdapt), 'Markdown 报告披露采样策略与提前终止情况');
+check(/采样策略/.test(buildHtml(attrCoin)), 'HTML 报告披露采样策略');
+
+let minErr = null;
+try {
+  await attribute({ old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 1, earlyStop: true, maxCalls: 50 }, { log: () => {} });
+} catch (err) {
+  minErr = err;
+}
+check(/--samples ≥ 2/.test(String(minErr?.message || '')), '--early-stop 且 samples=1 时明确报错');
+
+const dryEarly = spawnSync(
+  process.execPath,
+  [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'attribute', '--old', 'v1', '--new', 'v2', '--probes', probesFile, '--provider', 'mock', '--judge', 'heuristic', '--samples', '3', '--min-samples', '2', '--early-stop', '--dry-run', '--json'],
+  { env: process.env, encoding: 'utf8' }
+);
+let dryEarlyJson = null;
+try {
+  dryEarlyJson = JSON.parse(dryEarly.stdout);
+} catch {
+  dryEarlyJson = null;
+}
+check(dryEarly.status === 0 && dryEarlyJson?.plan?.earlyStop === true && dryEarlyJson?.plan?.minSamples === 2, 'CLI 接受并透出 --early-stop / --min-samples');
+check(dryEarlyJson?.plan?.plannedCallsMin < dryEarlyJson?.plan?.plannedCalls, 'dry-run 给出调用量上下限');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

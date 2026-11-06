@@ -35,6 +35,17 @@
         "newId": { "type": "string" },
         "probes": { "type": "integer", "minimum": 1 },
         "samples": { "type": "integer", "minimum": 1 },
+        "sampling": {
+          "type": "object",
+          "description": "采样策略（v1.1 起可选，旧的 attribution 文件不含此字段）：fixed=固定采样，adaptive=先测后补",
+          "required": ["policy", "minSamples", "samples"],
+          "additionalProperties": false,
+          "properties": {
+            "policy": { "enum": ["fixed", "adaptive"] },
+            "minSamples": { "type": "integer", "minimum": 1 },
+            "samples": { "type": "integer", "minimum": 1 }
+          }
+        },
         "provider": {
           "type": "object",
           "required": ["name", "model"],
@@ -87,6 +98,12 @@
           "rawEffect": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
           "changedProbes": { "type": "integer", "minimum": 0 },
           "probeCount": { "type": "integer", "minimum": 1 },
+          "samplesUsed": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "该改动块实际使用的采样次数（自适应采样时可能小于 experiment.samples）"
+          },
+          "extended": { "type": "boolean", "description": "自适应采样时该块是否补采样到满采样" },
           "samplingInsufficient": { "type": "boolean" },
           "unreliableProbes": { "type": "array", "items": { "type": "string" } },
           "verification": {

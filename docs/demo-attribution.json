@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
-  "id": "attr-20261106173129-ba24",
-  "createdAt": "2026-11-06T17:31:29.327Z",
+  "id": "attr-20261106185518-d516",
+  "createdAt": "2026-11-06T18:55:18.608Z",
   "kind": "prompt",
   "kindLabel": "用户提示词",
   "confidence": {
@@ -18,7 +18,12 @@
     "oldId": "triage-v1",
     "newId": "triage-v2",
     "probes": 3,
-    "samples": 2,
+    "samples": 3,
+    "sampling": {
+      "policy": "adaptive",
+      "minSamples": 2,
+      "samples": 3
+    },
     "provider": {
       "name": "deepseek",
       "model": "deepseek-flash",
@@ -32,10 +37,10 @@
       "name": "doubao",
       "model": "doubao-desktop"
     },
-    "maxCalls": 100,
-    "calls": 24,
-    "cacheHits": 24,
-    "elapsedMs": 26,
+    "maxCalls": 200,
+    "calls": 36,
+    "cacheHits": 36,
+    "elapsedMs": 59,
     "dryRun": false
   },
   "noise": {
@@ -60,13 +65,15 @@
       "rawEffect": 0.3333333333333333,
       "changedProbes": 1,
       "probeCount": 3,
+      "samplesUsed": 3,
+      "extended": true,
       "samplingInsufficient": false,
       "unreliableProbes": [],
       "verification": {
         "judge": "doubao",
         "model": "doubao-desktop",
-        "agree": 12,
-        "total": 12,
+        "agree": 27,
+        "total": 27,
         "fallback": false
       },
       "verificationSkipped": false
@@ -80,13 +87,15 @@
       "rawEffect": 1,
       "changedProbes": 3,
       "probeCount": 3,
+      "samplesUsed": 2,
+      "extended": false,
       "samplingInsufficient": false,
       "unreliableProbes": [],
       "verification": {
         "judge": "doubao",
         "model": "doubao-desktop",
-        "agree": 12,
-        "total": 12,
+        "agree": 18,
+        "total": 18,
         "fallback": false
       },
       "verificationSkipped": false
@@ -100,6 +109,8 @@
       "rawEffect": 0,
       "changedProbes": 0,
       "probeCount": 3,
+      "samplesUsed": 2,
+      "extended": false,
       "samplingInsufficient": false,
       "unreliableProbes": [],
       "verification": null,

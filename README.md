@@ -3,7 +3,23 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-94%2F94%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-113%2F113%20passing-brightgreen)
+
+## v1.5 更新摘要
+
+采样支持**自适应提前停止**：`--early-stop` + `--min-samples <n>`。先测 min 次；只有当「未校正的原始变化率落在 10%~70% 的含糊区间」或「噪声地板 ≥15%」时才补采样到 `--samples` 次，清晰为 0 / 1 的块直接停止。
+
+```bash
+pcause attribute --old triage-v1 --new triage-v2 --probes examples/probes.jsonl \
+  --provider deepseek --model deepseek-flash --judge deepseek --verify doubao \
+  --samples 3 --min-samples 2 --early-stop --concurrency 4
+```
+
+- **省调用**：清晰块的判定在 min 次采样时就已稳定，不必为每一块都付出满采样成本；`--dry-run` 会给出调用量「下限（全部提前停止）～上限（全部补采样）」。
+- **不引入循环反馈**：停止判断只用**未校正的原始变化率**，噪声校正在采样决策之后进行（用校正值做决策会让方差更大的估计反过来影响采样）。
+- **阈值固定、不事后调**：含糊区间 10%~70%、噪声地板 15% 写死在 `src/sampling.mjs`，避免「看结果再调阈值」。
+- **如实披露**：报告与 `--json` 写明采样策略、哪些块提前停止、哪些块补采样、每块实际采样次数（`samplesUsed` / `extended`），并提示截断偏倚风险。
+- 自测现为 **113/113**（新增 19 项：阈值判定、提前停止省调用、含糊块补采样、schema / 报告披露、CLI 参数与 dry-run 上下限）。
 
 ## v1.4 更新摘要
 
@@ -106,12 +122,12 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 56/56 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 113/113 项离线自测，不联网、不花钱
 ```
 
 生成 Key 不需要：`deepseek` 通道会自动读取 `DEEPSEEK_API_KEY` 环境变量或 `~/.dsh/.credentials.yaml`；`doubao` 通道复用**已登录的豆包桌面版**（经本机 `doubao-bridge` 技能，无需任何 API Key）。
 
-跑演示（3 个探针 × 3 个改动块，约 1 分钟）：
+跑演示（3 个探针 × 3 个改动块，自适应采样，约 1.5 分钟）：
 
 ```bash
 node src/cli.mjs init
@@ -124,17 +140,18 @@ npm run demo
 ### 演示输出（真实运行）
 
 ```
-✔ 归因完成：attr-20261106170034-d13c（24 次调用 / 52.5s，缓存命中 12）
-  噪声地板：0%　采样：2 次/探针
+✔ 归因完成：attr-20261106185518-d516（57 次调用 / 84.6s，缓存命中 36）
+  噪声地板：0%　采样：3 次/探针（自适应，先 2 次）
 
   ■  h2  决定性   100%（原始 100%）  + 最终只输出一个 JSON 对象：{"category": "<类别名>"}
-        └ 第二意见（doubao）：判定一致 12/12
+        └ 第二意见（doubao）：判定一致 18/18
   ▨  h1  部分影响   33%（原始  33%）  + 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」
-        └ 第二意见（doubao）：判定一致 12/12
+        └ 自适应采样：先测 2 次后补采样到 3 次
+        └ 第二意见（doubao）：判定一致 27/27
   □  h3  无影响      0%（原始   0%）  + 注意：本分类器是内部工具，输出会进入数据看板
 ```
 
-结论一目了然：把输出改成 JSON 的那条（h2）是决定性的；情绪加急规则（h1）只对 1/3 的工单生效；「内部工具、不对外公开」这句对行为毫无影响，可以删。报告在 `.pcause/attributions/attr-*.md` 与 `.html`（HTML 可直接双击打开）；仓库里的 **[docs/demo-report.html](docs/demo-report.html)** 就是这次运行的报告副本。
+结论一目了然：把输出改成 JSON 的那条（h2）是决定性的；情绪加急规则（h1）只对 1/3 的工单生效，且因落在含糊区间被补采样到 3 次确认；「内部工具、不对外公开」这句对行为毫无影响，提前停止、可以删。报告在 `.pcause/attributions/attr-*.md` 与 `.html`（HTML 可直接双击打开）；仓库里的 **[docs/demo-report.html](docs/demo-report.html)** 就是这次运行的报告副本。
 
 ## 4. 机器可消费与 CI 集成（v1.1）
 
@@ -185,6 +202,8 @@ pcause selftest                               离线自测
 | `--verify <judge>` | 第二意见判定器，如 `--verify doubao` |
 | `--kind prompt\|system\|agent` | 归因对象类型（默认 prompt；只影响报告里的假设可信度提示，不改变判定逻辑） |
 | `--samples <n>` | 每探针独立生成 n 次（默认 1；**≥2 才会测噪声地板并校正，推荐 2~3**） |
+| `--early-stop` | 采样提前停止：先测 `--min-samples` 次，仅在结论含糊或噪声偏高时补采样到 `--samples` 次（见 v1.5） |
+| `--min-samples <n>` | 自适应采样的首轮次数（默认 2，需配合 `--early-stop` 且 ≤ `--samples`） |
 | `--concurrency <n>` | 生成阶段并发请求数（默认 1；2~4 较快，过高易触发限流。预算按发起前预占，不会超支） |
 | `--config <file>` | 插件配置文件（默认 `./pcause.config.json`，或环境变量 `PCAUSE_CONFIG`；见 v1.4） |
 | `--limit <n>` | 只用前 n 个探针 |
@@ -246,10 +265,11 @@ pcause/
 │   ├── concurrency.mjs 有界并发调度（保序、失败即停调度、进度回调）
 │   ├── plugins.mjs    Provider / Judge 插件注册表（pcause.config.json、动态 import、接口校验）
 │   ├── compare.mjs    归因结论迁移对比（签名校验、按内容对齐 hunk、迁移报告）
+│   ├── sampling.mjs   采样策略：固定 / 自适应提前停止（阈值与补采样判定）
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  94 项离线自测
+├── test/selftest.mjs  113 项离线自测
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json
@@ -268,6 +288,7 @@ pcause/
 - **`compare` 只比结论，不重跑实验**：它对比的是两轮归因各自的结论，不会替你重新采样；两次实验间隔期间换了模型服务商、探针或采样数都会被签名校验拦下（可 `--allow-incompatible` 强看，但差异可能来自实验条件）。另外，若「同一句改动」被改写过措辞（旧行/新行内容变了），会被当成「消失 + 新增」，因为对齐主键是内容。
 - **并发只作用于生成阶段**：判定器与复核仍按批串行（保持判定批次可解释），`--concurrency` 过大容易触发 API 限流，建议 2~4。预算为「发起前预占」，并发下不会超支，但预算紧张时可能比串行更早进入「采样不足」。
 - **插件是可执行代码，不是沙箱**：pcause 只加载 `pcause.config.json` 里显式声明的本地模块（不做远程加载、不自动安装），但插件会以你的用户权限运行，请只使用信任的插件。预算按「一次 `generate` / 一个判定批次 = 1 次调用」记账，若插件内部自己发多次请求，实际成本会超出统计口径（核心无法感知，需插件作者自负）。插件模块在进程内只初始化一次，修改插件后需重新运行命令。
+- **自适应采样有截断偏倚风险**：`--early-stop` 只在含糊/高噪声时才补采样，清晰落在 0 或 1 附近的块会被提前截断，理论上会让效应分布的尾部变窄、均值轻微偏移；阈值提前固定、停止判断只用原始变化率，报告披露每块实际采样数与提前终止情况，但**它不能替代满采样实验**。需要发表级严谨结论时请关掉 `--early-stop`（默认关闭）做满采样；不确定时先用 `--limit` 缩小探针集再满采样。
 
 ## 10. 许可
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>提示词归因报告 · attr-20261106173129-ba24</title>
+<title>提示词归因报告 · attr-20261106185518-d516</title>
 <style>
   :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --fg:#e6e8ee; --muted:#98a0b3;
     --line:#2a2f3a; --accent:#7aa2ff; --good:#3ecf8e; --warn:#f0b429; --bad:#ff6b6b; }
@@ -56,7 +56,7 @@
 <body>
 <main>
   <h1>提示词归因报告</h1>
-  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106173129-ba24 · 2026-11-06 17:31:29</div>
+  <div class="sub">不猜哪句改动起作用，用反事实消融实验测出来 · attr-20261106185518-d516 · 2026-11-06 18:55:18</div>
   <section>
     <h2>阅读须知（固定三条）</h2>
     <ul class="caveats"><li>假设：本分析假设各改动块（hunk）近似独立，不检测改动与改动之间的交互效应。</li><li>约束：结论高度依赖探针集合、判定器与采样随机噪声；判定器本身也可能出错。</li><li>泛化：归因对象类型不同（提示词 / 系统提示 / Agent 指令），上述假设的可信度不同。</li></ul>
@@ -66,9 +66,10 @@
     <div class="card"><div class="k">归因对象</div><div class="v">用户提示词</div><div class="note">假设可信度：中等</div></div>
     <div class="card"><div class="k">生成模型</div><div class="v">deepseek / deepseek-flash</div></div>
     <div class="card"><div class="k">判定器</div><div class="v">deepseek + doubao</div></div>
-    <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">3 / 2 / 3</div></div>
+    <div class="card"><div class="k">探针 / 采样 / 改动块</div><div class="v">3 / 3 / 3</div><div class="note">自适应：先测 2 次</div></div>
+    <div class="card"><div class="k">采样策略</div><div class="v">自适应（先测 2 次）</div><div class="note">仅在结论含糊或噪声偏高时补到 3 次</div></div>
     <div class="card"><div class="k">噪声地板</div><div class="v">0%</div></div>
-    <div class="card"><div class="k">调用 / 耗时</div><div class="v">24 次 · 0.0s</div></div>
+    <div class="card"><div class="k">调用 / 耗时</div><div class="v">36 次 · 0.1s</div></div>
   </div>
   
   <section>
@@ -83,8 +84,8 @@
       <td><div class="bar"><span style="width:100%"></span></div>100%</td>
       <td class="muted">100%</td>
       <td><span class="tag decisive">决定性</span></td>
-      <td>12/12</td>
-      <td class="muted"></td>
+      <td>18/18</td>
+      <td class="muted">采样 2/3</td>
     </tr>
 <tr class="">
       <td><code>h1</code></td>
@@ -94,8 +95,8 @@
       <td><div class="bar"><span style="width:33%"></span></div>33%</td>
       <td class="muted">33%</td>
       <td><span class="tag partial">部分影响</span></td>
-      <td>12/12</td>
-      <td class="muted"></td>
+      <td>27/27</td>
+      <td class="muted">采样 3/3（补采样）</td>
     </tr>
 <tr class="">
       <td><code>h3</code></td>
@@ -106,7 +107,7 @@
       <td class="muted">0%</td>
       <td><span class="tag inert">无影响</span></td>
       <td>—</td>
-      <td class="muted"></td>
+      <td class="muted">采样 2/3</td>
     </tr></tbody>
     </table>
   </section>
@@ -145,19 +146,19 @@ OTHER</div>
         <summary><code>h1</code> · 部分影响 · 校正后影响 33%（原始 33%）</summary>
         <div class="diff"><div class="add">+ 如果工单情绪激动或明确投诉，在类别名后追加「-URGENT」。</div></div>
         <div class="pair">
-            <div class="probe">探针 <code>p1</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：A 输出 REFUND-URGENT，B 输出 REFUND，分类标签不同，核心内容有差异。</div>
+            <div class="probe">探针 <code>p1</code> — 变化率 100%，展示的配对：<span class="yes">行为改变</span>：分类标签从 REFUND 变为 REFUND-URGENT，核心输出内容不同</div>
             <div class="io"><b>新提示词输出</b>
 {"category": "REFUND-URGENT"}</div>
             <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
 {"category": "REFUND"}</div>
           </div><div class="pair">
-            <div class="probe">探针 <code>p2</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：两者输出完全相同，均为 TECH。</div>
+            <div class="probe">探针 <code>p2</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：两输出完全相同，无任何差异。</div>
             <div class="io"><b>新提示词输出</b>
 {"category": "TECH"}</div>
             <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
 {"category": "TECH"}</div>
           </div><div class="pair">
-            <div class="probe">探针 <code>p3</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="probe">探针 <code>p3</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同，无任何行为差异</div>
             <div class="io"><b>新提示词输出</b>
 {"category": "OTHER"}</div>
             <div class="io" style="margin-top:6px"><b>回退 h1 后</b>
@@ -168,7 +169,7 @@ OTHER</div>
         <summary><code>h3</code> · 无影响 · 校正后影响 0%（原始 0%）</summary>
         <div class="diff"><div class="add">+ 注意：本分类器是内部工具，输出会进入数据看板。</div></div>
         <div class="pair">
-            <div class="probe">探针 <code>p1</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同</div>
+            <div class="probe">探针 <code>p1</code> — 变化率 0%，展示的配对：<span class="no">行为未变</span>：输出完全相同，无任何差异。</div>
             <div class="io"><b>新提示词输出</b>
 {"category": "REFUND-URGENT"}</div>
             <div class="io" style="margin-top:6px"><b>回退 h3 后</b>
