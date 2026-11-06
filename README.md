@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-273%2F273%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-280%2F280%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -85,7 +85,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 273/273 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 280/280 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -276,6 +276,10 @@ npm run release:check -- --offline   # 无网环境：跳过 npm 登录与 regis
 
 输出把每个改动块标成 不变 / 升级 / 降级 / 新增 / 消失，并给出判定与影响值的前后对比。完整说明与真实示例见 [docs/compare.md](docs/compare.md)、[docs/compare-demo.md](docs/compare-demo.md)。
 
+## 4.7 报告怎么读（v1.24）
+
+报告里三个数字最容易误读：**校正后影响**（默认判定依据）、**原始变化率**（未扣噪声）、**噪声地板**（同一提示词自比的变化率）。0% 不等于没测（看 `unmeasured` / 采样不足标记），第二意见一致不等于结论正确，影响百分比也不代表业务重要性。完整读法、证据区怎么用、HTML/JSON/Markdown 的取舍见 [docs/report.md](docs/report.md)。
+
 ## 5. 命令
 
 ```
@@ -378,10 +382,10 @@ pcause/
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  273 项离线自测
+├── test/selftest.mjs  280 项离线自测
 ├── scripts/           发布前自检：preflight（版本/链接/文件一致性）、pack-check（安装演练）、release-check（发布检查单）
 ├── examples/          分类器演示的提示词与探针；plugins/ 为插件示例，pcause.config.example.json 为配置样例
-├── docs/              演示报告（HTML / Markdown）、演示 JSON、[compare 指南](docs/compare.md) 与对比演示、[插件开发指南](docs/plugins.md)
+├── docs/              演示报告（HTML / Markdown）、演示 JSON、[报告读法](docs/report.md)、[compare 指南](docs/compare.md) 与对比演示、[插件开发指南](docs/plugins.md)
 ├── CHANGELOG.md       版本变更历史（Keep a Changelog 轻量格式）
 └── package.json
 ```

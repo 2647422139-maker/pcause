@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.24.0] - 2026-11-07
+
+### Added
+
+- 新增 `docs/report.md` 报告阅读指南：顶部实验条件怎么确认、三个核心数字（原始变化率 / 噪声地板 / 校正后影响）的关系与公式、三个最易误读（0% 不是没测、第二意见一致不等于正确、影响百分比不等于业务重要性）、证据区怎么用、建议怎么落地、HTML / JSON / Markdown 的取舍。
+- README 新增「4.7 报告怎么读」并链接指南；目录树同步。
+- 新增 7 项自测（指南体量、三个数字、0% 语义、第二意见与未测块、schema 与 compare 链接、README 章节与链接、影响强度与重要性区分），总自测 280 项。
+
 ## [0.23.0] - 2026-11-07
 
 ### Added

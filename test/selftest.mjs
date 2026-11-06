@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.23.0', '版本号升到 0.23.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.24.0', '版本号升到 0.24.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.23.0'), 'CLI 版本号与 package.json 同步（0.23.0）');
+check(String(cliVersion.stdout).includes('0.24.0'), 'CLI 版本号与 package.json 同步（0.24.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.23.0', '任意 cwd 下 version 不依赖工作目录（0.23.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.24.0', '任意 cwd 下 version 不依赖工作目录（0.24.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -919,6 +919,18 @@ check(cdText.includes('不重跑') && cdText.includes('unmeasured'), 'compare �
 const readmeCompare = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
 check(readmeCompare.includes('docs/compare.md') && readmeCompare.includes('## 4.6'), 'README 有 4.6 章节并链接 compare 指南');
 check(fs.existsSync(path.join(PKG_ROOT, 'docs', 'compare-demo.md')) && cdText.includes('compare-demo.md'), 'compare 指南引用真实演示文件');
+
+// ===== [33/33] v1.24 报告阅读指南 =====
+const reportDoc = path.join(PKG_ROOT, 'docs', 'report.md');
+const rd = fs.existsSync(reportDoc) ? fs.readFileSync(reportDoc, 'utf8') : '';
+check(rd.length > 1500, 'docs/report.md 存在且有实质内容');
+check(rd.includes('噪声地板') && rd.includes('原始变化率') && rd.includes('校正后影响'), '报告指南解释三个核心数字');
+check(rd.includes('0% ≠ 没测') || rd.includes('0% 不等于没测'), '报告指南澄清「0% 不是没测」');
+check(rd.includes('第二意见') && rd.includes('unmeasured'), '报告指南说明第二意见与未测块语义');
+check(rd.includes('compare.md') && rd.includes('schema/attribution.schema.json'), '报告指南链接 compare 指南与 JSON schema');
+const readmeReport = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readmeReport.includes('docs/report.md') && readmeReport.includes('## 4.7'), 'README 有 4.7 章节并链接报告指南');
+check(rd.includes('影响百分比 ≠ 重要性') || rd.includes('百分比 ≠ 重要性'), '报告指南区分影响强度与业务重要性');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
