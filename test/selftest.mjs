@@ -302,6 +302,66 @@ check(!!cmpJson && cmpJson.ok === true && Array.isArray(cmpJson.hunks), 'CLI com
 const rCmpBad = runCompare([attr.id, attr2.id]);
 check(rCmpBad.status === 1 && rCmpBad.stderr.includes('签名不一致'), 'CLI compare 签名不一致时退出码 1 并说明原因');
 
+console.log('\n[13/13] v1.3：有界并发（--concurrency）');
+const { mapLimit } = await import('../src/concurrency.mjs');
+let active = 0;
+let peak = 0;
+const doubled = await mapLimit(Array.from({ length: 12 }, (_, i) => i), 3, async (x) => {
+  active++;
+  peak = Math.max(peak, active);
+  await new Promise((r) => setTimeout(r, 5));
+  active--;
+  return x * 2;
+});
+check(peak <= 3 && peak >= 2, `并发上限生效（峰值 ${peak}，上限 3）`);
+check(doubled.every((v, i) => v === i * 2), '并发结果按输入顺序返回，顺序稳定');
+const progress = [];
+await mapLimit([1, 2, 3, 4, 5], 2, async (x) => x, {
+  onProgress: (d, t) => progress.push(`${d}/${t}`),
+});
+check(progress.length === 5 && progress[4] === '5/5', 'onProgress 按完成数上报进度');
+
+let started = 0;
+let rejected = '';
+try {
+  await mapLimit([1, 2, 3, 4, 5], 2, async (x) => {
+    started++;
+    if (x === 2) throw new Error('boom');
+    await new Promise((r) => setTimeout(r, 5));
+    return x;
+  });
+} catch (err) {
+  rejected = err.message;
+}
+check(rejected === 'boom', '任一任务失败时抛出原始错误');
+check(started <= 4, `失败后不再调度新任务（已启动 ${started}/5）`);
+
+const runAttr = (concurrency, maxCalls) =>
+  attribute(
+    { old: 'v1', new: 'v2', probes: probesFile, provider: 'mock', judge: 'heuristic', samples: 2, maxCalls, concurrency },
+    { log: () => {} }
+  );
+const attrC1 = await runAttr(1, 100);
+const attrC4 = await runAttr(4, 100);
+check(attrC1.concurrency === 1 && attrC4.concurrency === 4, '归因结果记录本次并发度');
+const brief = (a) => JSON.stringify(a.hunks.map((h) => [h.hunk.id, h.verdict, h.effect, h.rawEffect]));
+check(brief(attrC1) === brief(attrC4), '并发度不改变归因结论与数值（结果按固定序号落位）');
+const attrConcBudget = await runAttr(3, 12);
+check(attrConcBudget.calls <= 12, `并发下 --max-calls 仍是硬上限（实际 ${attrConcBudget.calls} 次）`);
+check(attrConcBudget.samplingInsufficient === true, '并发 + 预算耗尽时正确标记采样不足');
+const rConc = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), ...cliArgs, '--concurrency', '3', '--json'], {
+  env: process.env,
+  encoding: 'utf8',
+});
+let concJson = null;
+try {
+  concJson = JSON.parse(rConc.stdout);
+} catch {
+  concJson = null;
+}
+check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.4.0', '版本号升到 0.4.0');
+
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);
 if (failures.length) {

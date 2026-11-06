@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-69%2F69%20passing-brightgreen)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-80%2F80%20passing-brightgreen)
+
+## v1.3 更新摘要
+
+生成阶段支持**有界并发**：`--concurrency <n>`（默认 1）。
+
+- **快而可控**：归因最耗时的是「探针数 × 采样数 × (1 + 改动块数)」次生成。`--concurrency 4` 让最多 4 个请求同时在飞，单轮耗时通常降到 1/2~1/3，并打印完成进度。
+- **预算仍是硬上限**：`--max-calls` 在**发起请求前预占**，并发再高也不会超支；代价是预算紧张时可能比串行更早停下（报告把未测完的块标为「采样不足」，不会误当「无影响」）。
+- **顺序不变、可复现**：每个任务按 `(探针序号, 采样序号)` 固定落位，并发与否得到同一份结论；任一请求失败会立即停止调度新任务，不会雪崩式烧钱。
+- **重跑不重复花钱**：所有请求走同一份内容寻址缓存（`.pcause/cache`），中断后重跑只补没跑完的采样点。
+- 自测新增 11 项并发断言（并发上限、结果保序、失败停止调度、并发下预算不超支、CLI 接受该参数），现为 **80/80**。
 
 ## v1.2 更新摘要
 
@@ -152,6 +162,7 @@ pcause selftest                               离线自测
 | `--verify <judge>` | 第二意见判定器，如 `--verify doubao` |
 | `--kind prompt\|system\|agent` | 归因对象类型（默认 prompt；只影响报告里的假设可信度提示，不改变判定逻辑） |
 | `--samples <n>` | 每探针独立生成 n 次（默认 1；**≥2 才会测噪声地板并校正，推荐 2~3**） |
+| `--concurrency <n>` | 生成阶段并发请求数（默认 1；2~4 较快，过高易触发限流。预算按发起前预占，不会超支） |
 | `--limit <n>` | 只用前 n 个探针 |
 | `--max-calls <n>` | 模型调用预算（默认 400，含判定器调用；预算不足的块标记 `samplingInsufficient`，不再静默中止） |
 | `--temperature <n>` | 采样温度（默认 0） |
@@ -194,6 +205,7 @@ v1.1 的四项加固来自与豆包的两轮方案评审：
 1. 第一轮豆包从泛用性 / 实用性 / 可扩展性三个维度给了一份优先级清单：泛化应先按「消融对象类型」隔离判定语义（而不是把 RAG 模板、工具 schema、模型参数一锅端）；落地必须先补预算分层、失败门禁、稳定机器输出；扩展应先定义 Provider / Judge / Reporter 接口。它同时提醒：pcause 最容易误用的不是模型不稳定，而是用户把「探针上的关联证据」当成严格因果。
 2. 第二轮把清单收敛到「一次迭代能完成、测试、发版」的范围：保留 `--kind` + 固定免责、`--dry-run` + 预算语义、CI 门禁、稳定 JSON schema 四项（全部是观测层 / 包装层，不动判定与采样内核）；采样提前停止、插件注册表、两次归因结论对比按规定进入 v1.2 路线。
 3. v1.2 的第一项按 roadmap 落地为 `compare`，其设计又回到豆包确认：签名必须包含探针集、采样数、生成器与判定器；对比时最容易翻车的是「只比 verdict、忽略 hunk 对齐错位」，所以实现用内容做主键、只比同一改动块的前后结论。
+4. v1.3 的并发设计同样先问过豆包：预算按**发起前预占**而不是等完成后再扣，否则 in-flight 请求会让预算透支；并发上限必须单独用 `--concurrency` 控制，不能拿预算当并发数用。它还提醒「重跑要按已完成采样点跳过、输出按固定序号排序」——pcause 用内容寻址缓存 + `(探针, 采样)` 固定落位实现，不需要额外状态文件。
 
 ## 8. 目录结构
 
@@ -206,11 +218,12 @@ pcause/
 │   ├── providers.mjs  模型通道：mock / deepseek / doubao
 │   ├── judge.mjs      判定器：heuristic / deepseek / doubao
 │   ├── attribute.mjs  归因引擎（采样、噪声地板、校正、第二意见、预算护栏、dry-run 预估）
+│   ├── concurrency.mjs 有界并发调度（保序、失败即停调度、进度回调）
 │   ├── compare.mjs    归因结论迁移对比（签名校验、按内容对齐 hunk、迁移报告）
 │   ├── schema.mjs     对外稳定 JSON 的映射与校验（核心契约）
 │   └── report.mjs     Markdown + 独立 HTML 报告
 ├── schema/attribution.schema.json  机器可读结果契约（draft-07，核心字段冻结）
-├── test/selftest.mjs  69 项离线自测
+├── test/selftest.mjs  80 项离线自测
 ├── examples/          分类器演示的提示词与探针
 ├── docs/              演示报告（HTML / Markdown）、演示 JSON 与归因对比演示
 └── package.json
@@ -227,6 +240,7 @@ pcause/
 - **成本**：调用数 ≈ 探针数 × 采样数 × (1 + hunk 数) + 判定批次数，**判定器的模型调用也计入 `--max-calls` 预算**。复杂提示词请先用 `--dry-run` 预估、再用 `--limit` 缩小探针集。
 - **JSON schema 治理**：核心字段（`meta / hunks / summary`）冻结、按语义化版本维护；新能力优先放进 `extensions`，破坏性变更需升主版本号并同步更新 CI 逻辑。
 - **`compare` 只比结论，不重跑实验**：它对比的是两轮归因各自的结论，不会替你重新采样；两次实验间隔期间换了模型服务商、探针或采样数都会被签名校验拦下（可 `--allow-incompatible` 强看，但差异可能来自实验条件）。另外，若「同一句改动」被改写过措辞（旧行/新行内容变了），会被当成「消失 + 新增」，因为对齐主键是内容。
+- **并发只作用于生成阶段**：判定器与复核仍按批串行（保持判定批次可解释），`--concurrency` 过大容易触发 API 限流，建议 2~4。预算为「发起前预占」，并发下不会超支，但预算紧张时可能比串行更早进入「采样不足」。
 
 ## 10. 许可
 

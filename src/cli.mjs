@@ -41,6 +41,7 @@ attribute 选项：
   --verify <judge>                  用第二个模型做第二意见复核，如 --verify doubao
   --kind prompt|system|agent        归因对象类型（默认 prompt；影响报告里的假设可信度提示）
   --samples <n>                     每个探针独立生成 n 次（默认 1；≥2 时自动测噪声地板并做校正，推荐 2~3）
+  --concurrency <n>                 生成阶段的并发请求数（默认 1；2~4 更快，过高易触发限流）
   --repeats <n>                     --samples 的旧别名
   --temperature <n>                 采样温度（默认 0，保证可复现）
   --limit <n>                       只用前 n 个探针
@@ -138,6 +139,7 @@ async function cmdAttribute(flags) {
     limit: num(flags.limit, 0),
     maxCalls: num(flags['max-calls'], 400),
     samples: num(flags.samples, num(flags.repeats, 1)),
+    concurrency: num(flags.concurrency, 1),
     cache: flags.cache !== 'false',
     kind,
   };
@@ -287,16 +289,21 @@ async function cmdRun(flags, pos) {
   const prompt = getPrompt(id);
   const probes = readProbes(flags.probes, { limit: num(flags.limit, 0) });
   const { makeProvider } = await import('./providers.mjs');
+  const { mapLimit } = await import('./concurrency.mjs');
   const provider = makeProvider(flags.provider || 'deepseek', {
     model: flags.model,
     temperature: num(flags.temperature, 0),
   });
-  const outputs = [];
-  for (const p of probes) {
-    const out = await provider.generate({ system: prompt.text, user: p.input });
-    outputs.push({ probeId: p.id, input: p.input, output: out });
-    if (!flags.json) console.error(`· ${p.id} ✓`);
-  }
+  const concurrency = Math.max(1, num(flags.concurrency, 1));
+  const outputs = await mapLimit(
+    probes,
+    concurrency,
+    async (p) => {
+      const out = await provider.generate({ system: prompt.text, user: p.input });
+      if (!flags.json) console.error(`· ${p.id} ✓`);
+      return { probeId: p.id, input: p.input, output: out };
+    }
+  );
   const run = saveRun({
     id: flags.out,
     promptId: id,
@@ -419,7 +426,7 @@ async function main() {
     case 'selftest':
       return cmdSelftest();
     case 'version':
-      tick('pcause 0.3.0');
+      tick('pcause 0.4.0');
       return 0;
     case 'help':
     case '--help':

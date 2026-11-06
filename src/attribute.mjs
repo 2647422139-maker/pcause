@@ -12,6 +12,7 @@ import { diffHunks, revertHunk, describeHunk } from './diff.mjs';
 import { getPrompt, readProbes, saveAttribution, newId } from './store.mjs';
 import { makeProvider } from './providers.mjs';
 import { makeJudge, JUDGE_BATCH_SIZE } from './judge.mjs';
+import { mapLimit } from './concurrency.mjs';
 import { KINDS, KIND_CONFIDENCE, CAVEATS } from './schema.mjs';
 
 export function verdictOf(effect) {
@@ -90,6 +91,12 @@ export async function attribute(opts, ctx = {}) {
   if (!hunks.length) throw new Error(`「${opts.old}」与「${opts.new}」没有差异，无需归因`);
   const samples = Math.max(1, Math.floor(Number(opts.samples ?? opts.repeats ?? 1) || 1));
   const maxCalls = opts.maxCalls || 400;
+  // 有界并发只影响「生成阶段」的调度；预算仍是硬上限（发起前预占，见 callGen）。
+  const concurrency = Math.max(1, Math.floor(Number(opts.concurrency || 1) || 1));
+  if (concurrency > 1) {
+    log(`并发：生成阶段最多 ${concurrency} 个请求同时在飞（结果顺序按探针 + 采样序号固定）`);
+    if (concurrency > 8) log('  ⚠ 并发过高容易触发 API 限流；建议 2~4');
+  }
 
   // dry-run：只预估调用量，绝不发起任何模型请求（也不读取 API Key）。
   const plan = planCalls(opts, hunks, probes);
@@ -129,19 +136,29 @@ export async function attribute(opts, ctx = {}) {
     return provider.generate({ system, user });
   };
 
-  // 每个探针独立生成 samples 次
-  const runOnProbes = async (promptText, n) => {
-    const perProbe = [];
-    for (const p of probes) {
-      const arr = [];
-      for (let k = 0; k < n; k++) arr.push(await callGen(promptText, p.input));
-      perProbe.push(arr);
+  // 每个探针独立生成 samples 次；并发只改变调度，结果按 (探针, 采样序号) 固定落位。
+  const runOnProbes = async (promptText, n, tag = '') => {
+    const tasks = [];
+    for (let pi = 0; pi < probes.length; pi++) {
+      for (let k = 0; k < n; k++) tasks.push({ pi, k, input: probes[pi].input });
     }
+    const step = Math.max(1, Math.floor(tasks.length / 5));
+    const outputs = await mapLimit(tasks, concurrency, (t) => callGen(promptText, t.input), {
+      onProgress: (doneCount, totalCount) => {
+        if (concurrency > 1 && (doneCount % step === 0 || doneCount === totalCount)) {
+          log(`  ${tag}进度 ${doneCount}/${totalCount}（并发 ${concurrency}）`);
+        }
+      },
+    });
+    const perProbe = probes.map(() => []);
+    tasks.forEach((t, i) => {
+      perProbe[t.pi][t.k] = outputs[i];
+    });
     return perProbe;
   };
 
   log(`基线：用「${opts.new}」在 ${probes.length} 个探针上生成输出（每探针 ${samples} 次，provider=${provider.name}/${provider.model}）`);
-  const baselineSamples = await runOnProbes(newP.text, samples);
+  const baselineSamples = await runOnProbes(newP.text, samples, '基线');
   const newOutputs = baselineSamples.map((arr) => arr[0]);
 
   // 噪声地板：同一提示词的不同采样之间被判「行为改变」的比例
@@ -181,7 +198,7 @@ export async function attribute(opts, ctx = {}) {
     let variantSamples;
     const promptText = revertHunk(newP.text, hunk);
     try {
-      variantSamples = await runOnProbes(promptText, samples);
+      variantSamples = await runOnProbes(promptText, samples, hunk.id + ' ');
     } catch (err) {
       if (!isBudget(err)) throw err;
       samplingInsufficient = true;
@@ -318,6 +335,7 @@ export async function attribute(opts, ctx = {}) {
     caveats: CAVEATS,
     probes,
     samples,
+    concurrency,
     maxCalls,
     newOutputs,
     hunks: variants,

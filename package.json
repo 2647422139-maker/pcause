@@ -1,6 +1,6 @@
 {
   "name": "pcause",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Prompt 因果归因器：用反事实消融实验测出提示词改动里哪一块真正改变了模型行为（含噪声校正、结论迁移对比、预算护栏、CI 门禁与稳定 JSON schema）",
   "type": "module",
   "bin": {
