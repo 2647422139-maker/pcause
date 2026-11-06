@@ -30,13 +30,15 @@ jobs:
             node: '24'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          # 零依赖项目没有 lockfile，缓存 node_modules 无意义，故不启用 cache
+          # 零依赖项目没有 lockfile，缓存 node_modules 无意义；v5 默认开自动缓存，
+          # 这里显式关掉，避免将来加了 packageManager 字段后行为悄悄变化。
           node-version: ${{ matrix.node }}
+          package-manager-cache: false
 
       - name: Offline selftest
         run: npm test

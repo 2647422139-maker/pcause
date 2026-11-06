@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.14.0] - 2026-11-07
+
+### Changed
+
+- CI 升级 `actions/checkout@v5`、`actions/setup-node@v5`（Node 24 运行时），消除 GitHub Actions 的「Node.js 20 is deprecated」告警。
+- `setup-node@v5` 显式配置 `package-manager-cache: false`：本项目零依赖、无 lockfile，缓存无收益，也避免将来加入 `packageManager` 字段后自动开启缓存引起行为变化。
+- 新增 4 项自测守住 CI 配置（必须 v5、不得残留 v4 及更老、Node 版本来自矩阵、显式关闭自动缓存）与 README 记录要求；总自测 202 项。
+
 ## [0.13.0] - 2026-11-07
 
 ### Added

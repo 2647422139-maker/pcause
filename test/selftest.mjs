@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.13.0', '版本号升到 0.13.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.14.0', '版本号升到 0.14.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.13.0'), 'CLI 版本号与 package.json 同步（0.13.0）');
+check(String(cliVersion.stdout).includes('0.14.0'), 'CLI 版本号与 package.json 同步（0.14.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -676,7 +676,12 @@ check(ciText.includes('npm run pack-check -- --quiet'), 'CI 做打包 + 独立�
 check(!ciText.includes('secrets.'), 'CI 不引用任何密钥');
 check(!ciText.includes('\t'), 'workflow 不含 tab 缩进（YAML 合法前提）');
 const readmeCi = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(ciText.includes('actions/checkout@v5') && ciText.includes('actions/setup-node@v5'), 'CI 使用 actions/checkout@v5 与 actions/setup-node@v5（Node 24 运行时，不再触发 Node 20 弃用告警）');
+check(!/actions\/(checkout|setup-node)@v[0-4]/.test(ciText), 'CI 不残留 checkout/setup-node 的 v4 及更老版本引用');
+check(ciText.includes('node-version: ${{ matrix.node }}'), 'setup-node 仍按矩阵设置 Node 版本');
+check(ciText.includes('package-manager-cache: false'), 'setup-node v5 显式关闭自动 npm 缓存（零依赖无 lockfile）');
 check(readmeCi.includes('actions/workflows/ci.yml/badge.svg') && readmeCi.includes('v1.11 更新摘要'), 'README 展示 CI badge 并记录 v1.11');
+check(readmeCi.includes('v1.14 更新摘要'), 'README 记录 v1.14（Actions v5 升级）');
 
 console.log('\n[22/22] v1.12：npm 发布演练（scripts/pack-check.mjs）');
 const pc = await import('../scripts/pack-check.mjs');

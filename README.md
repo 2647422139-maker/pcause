@@ -3,7 +3,17 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-197%2F197%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-202%2F202%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+
+## v1.14 更新摘要
+
+把自己的 CI 捡干净：`actions/checkout@v4` / `actions/setup-node@v4` 已在 GitHub 官方告警里被强制跑在 Node 24 上（Node 20 弃用），升级到 `@v5` 并**验证告警真的消失**，而不是只看「CI 绿了」。
+
+- 升级 `actions/checkout@v5`、`actions/setup-node@v5`（两者都跑在 Node 24 运行时；要求 runner ≥ v2.327.1，GitHub 托管 runner 天然满足，自托管才需要注意）。
+- `setup-node@v5` 默认会在检测到 `packageManager` 字段时自动开 npm 缓存。本项目零依赖、无 lockfile，缓存毫无收益，因此显式写 `package-manager-cache: false`，避免将来有人加了字段后缓存行为悄悄变化。
+- `node-version` 仍由矩阵下发（`${{ matrix.node }}`），矩阵本身不变：Node 20/22 × ubuntu/windows + Node 24 仅 ubuntu 前瞻。
+- 新增 5 项自测守住 CI 配置：必须用 v5、不得残留 `checkout/setup-node@v4` 及更老版本、Node 版本仍来自矩阵、显式关闭自动缓存；README 必须记录本版本。
+- 验证方式：提交后看新 run 的 **Annotations** 面板（不再有 Node 20 deprecated 黄色注解），并在原始 job 日志里搜索 `Node.js 20 is deprecated` 确认零命中。
 
 ## v1.13 更新摘要
 
@@ -13,7 +23,7 @@
 - **diff 不再被换行差异污染**：`splitLines` 走同一套归一化，同一份提示词用 CRLF 保存或用 LF 保存，得到**完全相同**的 hunk；旧实现只是替换 CRLF，BOM 仍会变成第一个字符差。
 - **真实 bug**：`pcause snapshot <id> --file <path>` 的「文件存在性守卫」在某次行级脚本改写中被整行误删，导致文件明明存在也永远报 `PCAUSE_NOT_FOUND`。已修复，并加两条回归测试（存在的文件能读、文件确实不存在时仍正确报错）。
 - **路径形态**：测试覆盖 `PCAUSE_HOME` 与提示词文件位于「带空格 + 中文」的目录下的完整链路（init → snapshot → list），以及中文路径工作区的快照读取。
-- 自测 **197/197**（新增 12 项：BOM 剥离、换行归一、组合归一、CRLF+BOM 读文件、BOM JSON、CRLF+BOM `.jsonl` 探针、CRLF 不产生幽灵 hunk、中文空格路径 init、snapshot --file 回归、落盘归一化、中文路径 list、缺文件报错回归）。
+- 自测 **197/197**（新增 12 项：BOM 剥离、换行归一、组合归一、CRLF+BOM 读文件、BOM JSON、CRLF+BOM `.jsonl` 探针、CRLF 不产生幽灵 hunk、中文空格路径 init、snapshot --file 回归、落盘归一化、中文路径 list、缺文件报错回归；v1.14 起为 202/202）。
 
 ## v1.12 更新摘要
 
@@ -214,7 +224,7 @@ pcause attribute --old review-v1 --new review-v2 --probes examples/probes.jsonl 
 
 ```bash
 git clone <this-repo> && cd pcause
-node test/selftest.mjs     # 197/197 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 202/202 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
