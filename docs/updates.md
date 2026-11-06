@@ -3,6 +3,18 @@
 > 本文件收录 README 中移出的各版本更新摘要，按时间倒序。
 > 机器可读的版本变更见 [CHANGELOG.md](../CHANGELOG.md)；最新摘要见 [README](../README.md#更新日志)。
 
+## v1.20 更新摘要
+
+Windows 是这类工具最容易翻车的平台：路径里有空格、有中文、有正斜杠和反斜杠混用、偶尔还超过 260 字符。v1.20 不新增功能，只把这几种真实场景固化成回归测试。
+
+- 在「中文 目录 with space」的绝对路径下建工作区，从不同 cwd 调 CLI：`init` / `snapshot --file`（绝对、相对、正斜杠混写）/ `list` / `doctor --json` / `version` / `demo --json` 全部通过。
+- 缺失文件时错误仍带原始路径（`PCAUSE_NOT_FOUND`），不会被转义或截断。
+- 378 字符、含中文的长路径可正常读取。
+- `version` 在仓库外任意目录调用都不依赖 cwd。
+- `docs/quickstart.md` 增加 Windows 路径提示：路径加引号即可，反斜杠/正斜杠都认。
+
+总自测 251 项，preflight 13/13，安装演练 10/10。
+
 ## v1.19 更新摘要
 
 报 bug 时最贵的不是修，而是来回追问环境。

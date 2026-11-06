@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.19.0', '版本号升到 0.19.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.20.0', '版本号升到 0.20.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.19.0'), 'CLI 版本号与 package.json 同步（0.19.0）');
+check(String(cliVersion.stdout).includes('0.20.0'), 'CLI 版本号与 package.json 同步（0.20.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -841,6 +841,45 @@ const cfgTpl = fs.existsSync(path.join(tplDir, 'config.yml')) ? fs.readFileSync(
 check(cfgTpl.includes('blank_issues_enabled') && cfgTpl.includes('docs/quickstart.md'), 'config.yml 配置了空白 issue 与 quickstart 联系入口');
 const helpText = fs.readFileSync(path.join(PKG_ROOT, 'src', 'cli.mjs'), 'utf8');
 check(helpText.includes('pcause doctor'), 'CLI help 中登记了 doctor 命令');
+
+// ===== [29/29] v1.20 Windows 全路径核对 =====
+// 在一个「中文 + 空格」的绝对路径下建工作区，从不同 cwd 调用 CLI，
+// 覆盖绝对路径、正反斜杠混写、长路径、缺失路径报错、任意 cwd 下的 version/demo。
+const winBase = path.join(tmpRoot, '中文 目录 with space');
+fs.mkdirSync(winBase, { recursive: true });
+const winHome = path.join(tmpRoot, 'home 中文 空格');
+const promptFile = path.join(winBase, '提示 词.md');
+fs.writeFileSync(promptFile, '你是一名客服助手。\n保持简洁。\n保持客观。\n', 'utf8');
+const winEnv = { ...process.env, PCAUSE_HOME: winHome };
+const runAt = (cwd, args) => spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), ...args], { cwd, env: winEnv, encoding: 'utf8' });
+const initW = runAt(winBase, ['init']);
+check(initW.status === 0 && fs.existsSync(path.join(winHome, 'prompts')), '中文+空格路径下 init 成功创建工作区');
+const snapAbs = runAt(winBase, ['snapshot', 'win-abs', '--file', promptFile]);
+check(snapAbs.status === 0 && /已保存快照 win-abs/.test(snapAbs.stdout), '快照支持含中文与空格的绝对路径 --file');
+const snapFwd = runAt(winBase, ['snapshot', 'win-fwd', '--file', promptFile.replaceAll('\\', '/')]);
+check(snapFwd.status === 0, '快照接受正斜杠混写路径（反斜杠与斜杠混用）');
+const relSnap = runAt(winBase, ['snapshot', 'win-rel', '--file', '.\\提示 词.md']);
+check(relSnap.status === 0, '快照支持带空格的相对路径');
+const listW = runAt(winBase, ['list']);
+check(listW.status === 0 && (listW.stdout.match(/win-(abs|fwd|rel)/g) || []).length >= 3, '跨目录 list 能列出三个快照');
+const docW = runAt(os.tmpdir(), ['doctor', '--json']);
+let docJson = null;
+try { docJson = JSON.parse(docW.stdout); } catch {}
+check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
+const verW = runAt(os.tmpdir(), ['version']);
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.20.0', '任意 cwd 下 version 不依赖工作目录（0.20.0）');
+const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
+check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
+const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
+fs.mkdirSync(longDir, { recursive: true });
+const longFile = path.join(longDir, 'probes 长路径.jsonl');
+fs.writeFileSync(longFile, '"测试输入"\n');
+const snapLong = runAt(winBase, ['snapshot', 'win-long', '--file', longFile]);
+check(snapLong.status === 0 && /已保存快照 win-long/.test(snapLong.stdout), '长路径（' + longFile.length + ' 字符、含中文）仍可读取');
+const demoOther = runAt(os.tmpdir(), ['demo', '--json']);
+let demoJson = null;
+try { demoJson = JSON.parse(demoOther.stdout); } catch {}
+check(demoOther.status === 0 && !!demoJson && path.isAbsolute(demoJson.mdPath), '任意 cwd 下 demo --json 可用且报告路径为绝对路径');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

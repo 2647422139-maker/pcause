@@ -2,6 +2,17 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.20.0] - 2026-11-07
+
+### Added
+
+- 新增 10 项 Windows 全路径回归测试：中文+空格路径下 `init`、含中文/空格的绝对路径 `--file`、反斜杠与正斜杠混写、带空格的相对路径、跨目录 `list`、任意 cwd 下 `doctor --json` 与 `version`、缺失文件报错保留原始路径、378 字符长路径读取、任意 cwd 下 `demo --json` 输出绝对路径。总自测 251 项。
+- `docs/quickstart.md` 新增「Windows 路径提示」：中文/空格路径可直接用，建议把路径用引号包住；反斜杠与正斜杠都可以；超长路径已回归覆盖。
+
+### 说明
+
+- 本轮只补测试与文档，没有改变 CLI 行为；`version` 也不再依赖当前工作目录（此前已按模块位置定位 `package.json`，本轮用跨 cwd 测试锁死）。
+
 ## [0.19.0] - 2026-11-07
 
 ### Added
