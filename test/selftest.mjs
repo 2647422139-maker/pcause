@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.24.0', '版本号升到 0.24.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.25.0', '版本号升到 0.25.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.24.0'), 'CLI 版本号与 package.json 同步（0.24.0）');
+check(String(cliVersion.stdout).includes('0.25.0'), 'CLI 版本号与 package.json 同步（0.25.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.24.0', '任意 cwd 下 version 不依赖工作目录（0.24.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.25.0', '任意 cwd 下 version 不依赖工作目录（0.25.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -931,6 +931,20 @@ check(rd.includes('compare.md') && rd.includes('schema/attribution.schema.json')
 const readmeReport = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
 check(readmeReport.includes('docs/report.md') && readmeReport.includes('## 4.7'), 'README 有 4.7 章节并链接报告指南');
 check(rd.includes('影响百分比 ≠ 重要性') || rd.includes('百分比 ≠ 重要性'), '报告指南区分影响强度与业务重要性');
+
+// ===== [34/34] v1.25 README「60 秒体验」真实输出与阅读引导 =====
+const readmeQuickV125 = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+const quickStartV125 = readmeQuickV125.indexOf('## 60 秒体验');
+const quickEndV125 = readmeQuickV125.indexOf('详见 [docs/quickstart.md]', quickStartV125) >= 0
+  ? readmeQuickV125.indexOf('详见 [docs/quickstart.md]', quickStartV125)
+  : readmeQuickV125.indexOf('## 更新日志', quickStartV125);
+const quickBlockV125 = readmeQuickV125.slice(quickStartV125, quickEndV125 > quickStartV125 ? quickEndV125 : undefined);
+check(quickStartV125 >= 0 && quickBlockV125.length > 500, 'README 有「60 秒体验」区块');
+check(quickBlockV125.includes('✔ 归因完成') && quickBlockV125.includes('决定性 100%') && quickBlockV125.includes('无影响 0%'), '60 秒区块含真实 demo 输出关键行');
+check(quickBlockV125.includes('<临时目录>') && quickBlockV125.includes('attr-…'), '60 秒区块用占位符代替临时路径与随机 id');
+check(!/C:\\\\Users|AppData/i.test(quickBlockV125), '60 秒区块不泄露本机路径');
+check(quickBlockV125.includes('看到这些说明正常') && quickBlockV125.includes('退出码'), '60 秒区块解释「什么算正常」');
+check(quickBlockV125.includes('噪声地板是') && quickBlockV125.includes('mock 生成器是确定性的'), '60 秒区块解释噪声地板为何是 0%');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

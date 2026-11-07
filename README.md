@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-280%2F280%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-286%2F286%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -20,21 +20,33 @@ node src/cli.mjs demo
 不需要 API Key、不联网、不写你的工作区（产物在系统临时目录）。真实输出示意（已截断，颜色与耗时随环境变化）：
 
 ```text
+✔ 已创建临时演示工作区：<临时目录>
+· 运行归因（mock 生成器 + heuristic 判定，不联网、不花钱）
+· 噪声地板：同一提示词重复生成之间的变化率 = 0%（每探针 2 次采样）
 ✔ 归因完成：attr-…（24 次生成/判定调用，噪声地板 0%）
   ■  h1  决定性 100%    + 输出必须使用 Markdown 表格呈现结论。
   ■  h2  决定性 100%    + 语气保持温和友好。
   □  h3  无影响 0%      + 注意：内部工具，输出会进入数据看板。
-报告：<临时目录>/attributions/attr-….md（另有 .html）
+报告：<临时目录>/attributions/attr-….md
+      <临时目录>/attributions/attr-….html
+下一步：pcause demo --json 看机器可读结果；想测自己的提示词，见 README 的「快速开始」
 ```
 
-> 本包尚未发布到 npm，所以上面的入口是 `git clone` + `node src/cli.mjs`；发布后可使用 `npx pcause demo`。样例输出是**示意**，真实报告字段与内容随提示词/探针变化。
+以上是**真实运行输出**（只把临时路径与随机 id 换成了 `<临时目录>` / `attr-…`）。看到这些说明正常：
+
+- 两个 `■ 决定性` + 一个 `□ 无影响`，进程退出码 `0`——说明 mock 生成 → hunk 消融 → heuristic 判定整条链路是通的；
+- `attr-…` 与 `<临时目录>` 每次都不一样（随机 id + 系统临时目录），演示产物不会写进你的仓库；
+- 噪声地板是 `0%`，因为 mock 生成器是确定性的；换成真实模型后通常不是 0%（这正是 pcause 做噪声校正的原因）；
+- 看到 `✖ [PCAUSE_…]` 才是出错：先跑 `pcause doctor`，或按[错误码表](#41-出错时怎么办错误码与自助排查v19)自查。
+
+> 本包尚未发布到 npm，所以上面的入口是 `git clone` + `node src/cli.mjs`；发布后可使用 `npx pcause demo`。演示提示词与探针是内置的，报告内容会随版本微调。
 
 想深入：看[它解决什么问题](#1-它解决什么问题) · 用[自己的提示词跑一次](#3-安装与快速开始) · 查[命令](#5-命令)与[已知限制](#9-已知限制)。
 
 ## 更新日志
 
 完整版本摘要归档在 [docs/updates.md](docs/updates.md)，机器可读版本变更见 [CHANGELOG.md](CHANGELOG.md)。
-最新一次：v1.18——README 首页重整：新增「60 秒体验」区块，历史摘要迁入 `docs/updates.md`，并修正章节编号。
+最新一次：v1.25——README「60 秒体验」换成真实运行输出，并补「看到这些说明正常」解读。
 
 ## 1. 它解决什么问题
 
@@ -85,7 +97,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 280/280 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 286/286 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
