@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pcause-selftest-'));
 process.env.PCAUSE_HOME = path.join(tmpRoot, '.pcause');
@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.25.0', '版本号升到 0.25.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.26.0', '版本号升到 0.26.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.25.0'), 'CLI 版本号与 package.json 同步（0.25.0）');
+check(String(cliVersion.stdout).includes('0.26.0'), 'CLI 版本号与 package.json 同步（0.26.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.25.0', '任意 cwd 下 version 不依赖工作目录（0.25.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.26.0', '任意 cwd 下 version 不依赖工作目录（0.26.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -945,6 +945,43 @@ check(quickBlockV125.includes('<临时目录>') && quickBlockV125.includes('attr
 check(!/C:\\\\Users|AppData/i.test(quickBlockV125), '60 秒区块不泄露本机路径');
 check(quickBlockV125.includes('看到这些说明正常') && quickBlockV125.includes('退出码'), '60 秒区块解释「什么算正常」');
 check(quickBlockV125.includes('噪声地板是') && quickBlockV125.includes('mock 生成器是确定性的'), '60 秒区块解释噪声地板为何是 0%');
+
+// ===== [35/35] v1.26 发布后验证脚本（postpublish-check） =====
+// 直接 import 被测模块（零依赖，不会触发 main）
+const ppc = await import(pathToFileURL(path.join(PKG_ROOT, 'scripts', 'postpublish-check.mjs')).href);
+check(typeof ppc.postPublishCheck === 'function', 'postpublish-check 导出 postPublishCheck');
+check(ppc.parseViewVersion('0.26.0\n', '', 0).version === '0.26.0', '解析 npm view 成功输出');
+check(ppc.parseViewVersion('', 'npm error code E404\nnpm error 404 Not Found', 1).published === false, '识别 npm view 404（未发布）');
+check(ppc.checkVersionOutput('pcause 0.24.0', '', '0.26.0').ok === false, '拒绝版本不一致（npx 命中旧缓存）');
+check(ppc.checkVersionOutput('pcause 0.26.0', '', '0.26.0').ok === true, '接受版本一致输出');
+check(ppc.parseDemoJson('{\"ok\":true,\"hunks\":[1,2],\"mdPath\":\"a\",\"htmlPath\":\"b\"}').ok === true, '接受合法 demo JSON');
+check(ppc.parseDemoJson('日志\n{\"ok\":true}').ok === false, '拒绝被日志污染的 demo 输出');
+check(ppc.parseDemoJson('{\"ok\":true,\"hunks\":[1]}').ok === false, '拒绝字段不全的 demo JSON（hunks 不足）');
+check(ppc.readmeInstallCommand('跑 npx pcause demo 或 npm i -g pcause').npx === 'npx pcause', '解析 README npx 安装命令');
+const offlineRun = ppc.postPublishCheck({ name: 'pcause', version: '0.26.0', offline: true, root: PKG_ROOT, log: () => {} });
+check(offlineRun.ok === true && offlineRun.verified === false, '--offline 跳过网络且不算失败');
+const fakeSh = (cmd, args) => {
+  const line = [cmd, ...args].join(' ');
+  if (line.includes('view')) return { status: 0, stdout: '0.26.0\n', stderr: '' };
+  if (line.includes('version')) return { status: 0, stdout: 'pcause 0.26.0\n', stderr: '' };
+  if (line.includes('demo')) return { status: 0, stdout: JSON.stringify({ ok: true, hunks: [{}, {}], mdPath: 'm', htmlPath: 'h' }), stderr: '' };
+  return { status: 0, stdout: '', stderr: '' };
+};
+const onlineOk = ppc.postPublishCheck({ name: 'pcause', version: '0.26.0', root: PKG_ROOT, sh: fakeSh, sleep: () => {}, log: () => {} });
+check(onlineOk.ok === true && onlineOk.verified === true, '线上模拟：版本一致 + npx + demo 全通过');
+const fakeMismatch = () => ({ status: 0, stdout: '0.26.0\n', stderr: '' });
+const onlineBad = ppc.postPublishCheck({
+  name: 'pcause', version: '0.26.0', root: PKG_ROOT, log: () => {}, sleep: () => {},
+  sh: (cmd, args) => {
+    const line = [cmd, ...args].join(' ');
+    if (line.includes('view')) return { status: 0, stdout: '0.26.0\n', stderr: '' };
+    if (line.includes('demo')) return { status: 0, stdout: '{"ok":true}', stderr: '' };
+    return { status: 0, stdout: 'pcause 0.24.0\n', stderr: '' };
+  },
+});
+check(onlineBad.ok === false, '线上模拟：旧缓存版本 / demo 输出异常时判失败');
+const pkgAfter = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
+check(pkgAfter.scripts['release:verify'] === 'node scripts/postpublish-check.mjs', 'package.json 暴露 release:verify');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

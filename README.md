@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-286%2F286%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-299%2F299%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -97,7 +97,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 286/286 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 299/299 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -206,6 +206,7 @@ echo $?   # 0 无命中；2 命中门禁；1 运行错误
 
 ```bash
 npm run preflight                                  # 全量（含自测，数秒）
+npm run release:verify                             # 发布后：查 registry 版本 + npx 跑目标版本 + demo --json（需已发布）
 node scripts/preflight.mjs --no-tests --quiet      # 只做静态检查，适合极快的本地预检
 echo $?                                            # 0 全部通过；1 有检查未通过
 ```

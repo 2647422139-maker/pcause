@@ -23,6 +23,7 @@ export const REQUIRED_IN_TARBALL = [
   'LICENSE',
   'scripts/preflight.mjs',
   'scripts/pack-check.mjs',
+  'scripts/postpublish-check.mjs',
 ];
 
 /** 绝不能进发布包的路径前缀 */

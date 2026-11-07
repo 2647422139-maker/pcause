@@ -2,6 +2,13 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.26.0] - 2026-11-07
+
+### Added
+
+- 新增 `npm run release:verify`（`scripts/postpublish-check.mjs`）：发布后验证已上线包真的可用——固定官方 registry 查询版本并带重试（避开 CDN 延迟）、`npx --no-cache` 启动目标版本并精确比对版本串（避开本地缓存旧包）、跑内置 `demo --json` 并校验 JSON 可解析与关键字段、校验 README 安装命令与包名一致。退出码 0/1，`--offline` 只做离线部分。
+- 决策逻辑拆成可注入依赖的纯函数（`parseViewVersion` / `checkVersionOutput` / `parseDemoJson` / `readmeInstallCommand`），新增 13 项自测覆盖假阳性/假阴性场景，总自测 299 项。
+
 ## [0.25.0] - 2026-11-07
 
 ### Changed
