@@ -3,6 +3,11 @@
 > 本文件收录 README 中移出的各版本更新摘要，按时间倒序。
 > 机器可读的版本变更见 [CHANGELOG.md](../CHANGELOG.md)；最新摘要见 [README](../README.md#更新日志)。
 
+## v1.27 更新摘要
+
+- 新增 `docs/faq.md`：把散落在 README/quickstart/附件的重复问题聚合成一页，并刻意写成「带判断依据」而不是「正确但没用的话」——例如 `0% 无影响` 与 `unmeasured` 是两种不同结论；结论和直觉不一致时按证据区 → 探针覆盖 → hunk 是否被合并的顺序排查；两次实验不同是模型非确定性，用噪声地板与第二意见一致率判断可信度。
+- README 增加 4.8 入口，quickstart 直链；自测守护 FAQ 覆盖清单、公式、预算三件套与 README 锚点真实存在（避免文档链接腐烂）。
+
 ## v1.26 更新摘要
 
 - 新增 `npm run release:verify`：发布后自动确认「npm 上的那个包」能用。查 registry 版本（固定官方源 + 重试 CDN 延迟）→ `npx --no-cache pcause@<ver> version` 精确比对版本串 → `npx --no-cache pcause@<ver> demo --json` 校验 JSON 与关键字段 → README 安装命令与包名一致。

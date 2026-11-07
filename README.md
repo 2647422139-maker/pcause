@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-299%2F299%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-310%2F310%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -97,7 +97,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 299/299 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 310/310 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -292,6 +292,10 @@ npm run release:check -- --offline   # 无网环境：跳过 npm 登录与 regis
 ## 4.7 报告怎么读（v1.24）
 
 报告里三个数字最容易误读：**校正后影响**（默认判定依据）、**原始变化率**（未扣噪声）、**噪声地板**（同一提示词自比的变化率）。0% 不等于没测（看 `unmeasured` / 采样不足标记），第二意见一致不等于结论正确，影响百分比也不代表业务重要性。完整读法、证据区怎么用、HTML/JSON/Markdown 的取舍见 [docs/report.md](docs/report.md)。
+
+## 4.8 常见问题（FAQ）
+
+要不要联网、花不花钱、`0%` 到底是什么、为什么两次结论不同、能不能测 system prompt、怎么接 CI、`unmeasured` 怎么处理——都收在 [docs/faq.md](docs/faq.md)，每条都带判断依据。
 
 ## 5. 命令
 

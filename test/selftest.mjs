@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.26.0', '版本号升到 0.26.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.27.0', '版本号升到 0.27.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.26.0'), 'CLI 版本号与 package.json 同步（0.26.0）');
+check(String(cliVersion.stdout).includes('0.27.0'), 'CLI 版本号与 package.json 同步（0.27.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.26.0', '任意 cwd 下 version 不依赖工作目录（0.26.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.27.0', '任意 cwd 下 version 不依赖工作目录（0.27.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -982,6 +982,35 @@ const onlineBad = ppc.postPublishCheck({
 check(onlineBad.ok === false, '线上模拟：旧缓存版本 / demo 输出异常时判失败');
 const pkgAfter = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
 check(pkgAfter.scripts['release:verify'] === 'node scripts/postpublish-check.mjs', 'package.json 暴露 release:verify');
+
+// ===== [36/36] v1.27 docs/faq.md 常见问题聚合 =====
+const faqPath = path.join(PKG_ROOT, 'docs', 'faq.md');
+const faq = fs.existsSync(faqPath) ? fs.readFileSync(faqPath, 'utf8') : '';
+check(faq.length > 2500, 'docs/faq.md 存在且有实质内容');
+const faqMust = [
+  '需要联网吗', '要花钱吗', '0% 无影响', '跑两次', '和直觉不一致',
+  'system prompt', '调用', '预算', '接进 CI', 'unmeasured', '可信', '没有差异',
+];
+const faqMissing = faqMust.filter((k) => !faq.includes(k));
+check(faqMissing.length === 0, 'FAQ 覆盖高频问题清单', faqMissing.join('、'));
+check(faq.includes('判断依据') && faq.includes('噪声地板'), 'FAQ 用判断依据而非空泛结论');
+check(faq.includes('不能当成无影响') && faq.includes('unmeasured'), 'FAQ 区分「无影响」与「未测」');
+check(faq.includes('effect = max(0, (c − w) / (1 − w))'), 'FAQ 给出噪声校正公式');
+check(faq.includes('--dry-run') && faq.includes('--max-calls') && faq.includes('--concurrency'), 'FAQ 说明预算控制三件套');
+check(faq.includes('--fail-on') && faq.includes('退出码'), 'FAQ 说明 CI 门禁与退出码');
+check(faq.includes('../README.md#41-') , 'FAQ 回链 README 错误码章节');
+
+// 链接锚点必须真实存在
+const { slugify, headingsOf } = await import(pathToFileURL(path.join(PKG_ROOT, 'scripts', 'preflight.mjs')).href);
+const readmeForFaq = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+const readmeSlugs = new Set(headingsOf(readmeForFaq).map(slugify));
+const readmeLinks = [...faq.matchAll(/\]\((\.\.\/README\.md#([^)]+))\)/g)];
+check(readmeLinks.length > 0 && readmeLinks.every((m) => readmeSlugs.has(m[2])), 'FAQ 里 README 锚点真实存在');
+
+// README 与 quickstart 要能直达 FAQ
+check(readmeForFaq.includes('docs/faq.md'), 'README 链接了 FAQ');
+const qsText = fs.readFileSync(path.join(PKG_ROOT, 'docs', 'quickstart.md'), 'utf8');
+check(qsText.includes('faq.md'), 'quickstart 链接了 FAQ');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

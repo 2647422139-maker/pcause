@@ -2,6 +2,13 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.27.0] - 2026-11-07
+
+### Added
+
+- 新增 `docs/faq.md`：聚合 10 个高频问题（联网/花费、`0%` 与 `unmeasured` 的区别、两次实验结论为何不同、结果与直觉不一致先查什么、能否测 system prompt、调用量与预算控制、CI 接入与退出码、报告可信度四个信号、`PCAUSE_NO_DIFF` 的含义），每条给出判断依据而非空泛结论；README 新增「4.8 常见问题（FAQ）」入口，quickstart 增加直链。
+- 新增 11 项自测（FAQ 覆盖清单、区分无影响/未测、噪声校正公式、预算三件套、CI 门禁、README 锚点真实存在、README/quickstart 双向链接），总自测 310 项。
+
 ## [0.26.0] - 2026-11-07
 
 ### Added
