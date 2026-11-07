@@ -360,7 +360,7 @@ try {
   concJson = null;
 }
 check(rConc.status === 0 && !!concJson && validatePublicJSON(concJson).length === 0, 'CLI 接受 --concurrency 且输出仍符合 schema');
-check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.27.0', '版本号升到 0.27.0');
+check(JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version === '0.28.0', '版本号升到 0.28.0');
 
 console.log('\n[14/14] v1.4：Provider / Judge 插件注册表');
 const { loadPluginRegistry } = await import('../src/plugins.mjs');
@@ -577,7 +577,7 @@ const mdKindPrompt = buildMarkdown(attr);
 check(mdKindPrompt.includes('判定维度') && mdKindPrompt.includes('通用实质行为差异'), 'prompt 报告标注通用判定维度');
 
 const cliVersion = spawnSync(process.execPath, [path.join(PKG_ROOT, 'src', 'cli.mjs'), 'version'], { env: process.env, encoding: 'utf8' });
-check(String(cliVersion.stdout).includes('0.27.0'), 'CLI 版本号与 package.json 同步（0.27.0）');
+check(String(cliVersion.stdout).includes('0.28.0'), 'CLI 版本号与 package.json 同步（0.28.0）');
 
 console.log('\n[17/17] 维护轮：首次使用者的预算与预期提示');
 const rPlan = runCli(['--samples', '2']);
@@ -867,7 +867,7 @@ let docJson = null;
 try { docJson = JSON.parse(docW.stdout); } catch {}
 check(docW.status === 0 && !!docJson && docJson.rows.some((r) => String(r.value).includes(winHome)), '任意 cwd 下 doctor --json 正确反映 PCAUSE_HOME（中文空格）');
 const verW = runAt(os.tmpdir(), ['version']);
-check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.27.0', '任意 cwd 下 version 不依赖工作目录（0.27.0）');
+check(verW.status === 0 && verW.stdout.trim() === 'pcause 0.28.0', '任意 cwd 下 version 不依赖工作目录（0.28.0）');
 const miss = runAt(winBase, ['snapshot', 'win-miss', '--file', path.join(winBase, '不存在的 提示词.md')]);
 check(miss.status === 1 && /PCAUSE_NOT_FOUND/.test(miss.stderr) && miss.stderr.includes('不存在的 提示词'), '缺失文件报 PCAUSE_NOT_FOUND 且提示里带原始路径');
 const longDir = path.join(winBase, ...Array.from({ length: 6 }, (_, i) => '段-中文-' + i + '-' + 'x'.repeat(40)));
@@ -1011,6 +1011,34 @@ check(readmeLinks.length > 0 && readmeLinks.every((m) => readmeSlugs.has(m[2])),
 check(readmeForFaq.includes('docs/faq.md'), 'README 链接了 FAQ');
 const qsText = fs.readFileSync(path.join(PKG_ROOT, 'docs', 'quickstart.md'), 'utf8');
 check(qsText.includes('faq.md'), 'quickstart 链接了 FAQ');
+
+// ===== [37/37] v1.28 Windows 安装无关性核对 =====
+const ic = await import(pathToFileURL(path.join(PKG_ROOT, 'scripts', 'install-check.mjs')).href);
+check(
+  typeof ic.checkInstalledTree === 'function' && typeof ic.minimalPath === 'function' && typeof ic.longProjectPath === 'function',
+  'install-check 导出可复用纯函数'
+);
+const fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pcause-tree-'));
+fs.mkdirSync(path.join(fakeRoot, 'src'), { recursive: true });
+fs.writeFileSync(path.join(fakeRoot, 'src', 'cli.mjs'), '');
+const tree1 = ic.checkInstalledTree(fakeRoot, { required: ['src/cli.mjs', 'README.md'], forbidden: ['test'] });
+check(tree1.missing.length === 1 && tree1.missing[0] === 'README.md', '安装树检查能发现缺失文件');
+fs.mkdirSync(path.join(fakeRoot, 'test'));
+const tree2 = ic.checkInstalledTree(fakeRoot, { required: ['src/cli.mjs'], forbidden: ['test'] });
+check(tree2.forbidden.includes('test'), '安装树检查能发现混入测试目录');
+fs.rmSync(fakeRoot, { recursive: true, force: true });
+const winPath = ic.minimalPath('C:\\node', { platform: 'win32', env: { SystemRoot: 'C:\\Windows' } });
+check(winPath.startsWith('C:\\node;') && winPath.includes('System32') && !winPath.toLowerCase().includes('npm'), 'minimalPath 生成 Windows 隔离 PATH');
+const posixPath = ic.minimalPath('/usr/local/node', { platform: 'linux' });
+check(posixPath.startsWith('/usr/local/node:') && posixPath.includes('/usr/bin'), 'minimalPath 生成 POSIX 隔离 PATH');
+const lp = ic.longProjectPath('/tmp/base');
+check(lp.length > 150 && /\s/.test(lp) && /[\u4e00-\u9fa5]/.test(lp), 'longProjectPath 生成深长且含空格/中文的路径');
+const pkgR28 = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
+check(!!pkgR28.scripts?.['install:check'], 'package.json 暴露 install:check');
+const pcText28 = fs.readFileSync(path.join(PKG_ROOT, 'scripts', 'pack-check.mjs'), 'utf8');
+check(pcText28.includes("'scripts/install-check.mjs'"), '发布包必含 install-check 脚本');
+const readme28 = fs.readFileSync(path.join(PKG_ROOT, 'README.md'), 'utf8');
+check(readme28.includes('install:check'), 'README 记录 install:check 用法');
 
 const total = passed + failures.length;
 console.log(`\n${failures.length ? '✖' : '✔'} ${passed}/${total} 项通过`);

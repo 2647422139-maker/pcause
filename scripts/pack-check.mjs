@@ -24,6 +24,7 @@ export const REQUIRED_IN_TARBALL = [
   'scripts/preflight.mjs',
   'scripts/pack-check.mjs',
   'scripts/postpublish-check.mjs',
+  'scripts/install-check.mjs',
 ];
 
 /** 绝不能进发布包的路径前缀 */

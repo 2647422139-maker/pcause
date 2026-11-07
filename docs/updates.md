@@ -3,6 +3,11 @@
 > 本文件收录 README 中移出的各版本更新摘要，按时间倒序。
 > 机器可读的版本变更见 [CHANGELOG.md](../CHANGELOG.md)；最新摘要见 [README](../README.md#更新日志)。
 
+## v1.28 更新摘要
+
+- 新增 `npm run install:check`（`scripts/install-check.mjs`）：用**真实安装**验证「不装全局、不配 PATH、装在又深又长的目录里」也能跑——15 项检查，含 203 字符安装路径、211 字符 `PCAUSE_HOME`、PATH 只留 node 目录、`npx --no-install` 本地解析、安装树禁含 `.pcause/`/`test/`。
+- 和 `pack-check` 的分工：pack-check 证明「包能装上、bin 能跑」，install-check 证明「恶劣环境也能跑」；对应豆包给的意见——安装兼容问题发布后再修，返工成本远高于发布前核对，且必须严格区分全局/本地、制造干净环境与超长路径，不能跑一遍 demo 就打勾。
+
 ## v1.27 更新摘要
 
 - 新增 `docs/faq.md`：把散落在 README/quickstart/附件的重复问题聚合成一页，并刻意写成「带判断依据」而不是「正确但没用的话」——例如 `0% 无影响` 与 `unmeasured` 是两种不同结论；结论和直觉不一致时按证据区 → 探针覆盖 → hunk 是否被合并的顺序排查；两次实验不同是模型非确定性，用噪声地板与第二意见一致率判断可信度。

@@ -3,7 +3,7 @@
 > 改完提示词，效果变好了——但到底是**哪一句**起了作用？
 > pcause 用反事实消融实验把这个问题**测**出来，而不是靠猜。
 
-![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-310%2F310%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
+![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![Node](https://img.shields.io/badge/node-%E2%89%A520-blue) ![tests](https://img.shields.io/badge/selftest-319%2F319%20passing-brightgreen) ![CI](https://github.com/2647422139-maker/pcause/actions/workflows/ci.yml/badge.svg)
 
 ## 60 秒体验（零 Key、零安装、零网络）
 
@@ -97,7 +97,7 @@ node src/cli.mjs demo
 ```bash
 git clone <this-repo> && cd pcause
 node src/cli.mjs demo      # 零 Key 演示：跑一次完整归因（mock 生成器 + 离线判定），产物写到系统临时目录
-node test/selftest.mjs     # 310/310 项离线自测，不联网、不花钱
+node test/selftest.mjs     # 319/319 项离线自测，不联网、不花钱
 npm run preflight          # 发布前自检：版本 / badge / 链接 / 文件 / 入口一次过（含自测）
 ```
 
@@ -248,6 +248,7 @@ npm test && node scripts/preflight.mjs --no-tests && npm run pack-check -- --qui
 
 ```bash
 npm run pack-check              # 10 项检查，几秒，产物自动清理
+npm run install:check           # 15 项「安装无关性」检查：不装全局 / 不配 PATH / 长路径 / 深目录
 node scripts/pack-check.mjs --keep   # 保留临时目录与 tgz，便于自己翻看
 npm run release:check           # 发布前检查（联网）：元数据/仓库状态/打包清单/preflight/pack-check/registry
 npm run release:check -- --offline  # 同上但跳过网络检查
@@ -296,6 +297,32 @@ npm run release:check -- --offline   # 无网环境：跳过 npm 登录与 regis
 ## 4.8 常见问题（FAQ）
 
 要不要联网、花不花钱、`0%` 到底是什么、为什么两次结论不同、能不能测 system prompt、怎么接 CI、`unmeasured` 怎么处理——都收在 [docs/faq.md](docs/faq.md)，每条都带判断依据。
+
+## 4.9 安装无关性核对（v1.28）
+
+用户最常见的翻车场景不是「功能不对」，而是**装上之后跑不起来**：只在自己机器上全局装过、PATH 里恰好有 node、装在浅目录里。这几种情况在 CI 里跑单测都发现不了。
+
+`npm run install:check` 用**真实安装**回答「换个环境还灵吗」：
+
+| 检查 | 怎么验 |
+| --- | --- |
+| 深长中文目录 | 安装到 **203 字符**、含空格与中文的嵌套目录 |
+| 安装树合规 | 落盘后必须含 11 个运行文件，且不含 `.pcause/`、`test/`、`.github/`、`pcause.config.json` |
+| 零依赖 | 安装项目的 `node_modules` 里只有 `pcause`，且 `dependencies` 为空 |
+| 不依赖全局安装 | 只通过本地 `node_modules/.bin/pcause` 运行 |
+| PATH 隔离 | PATH 里只留 `node` 所在目录 + 系统目录（移除 npm 全局 bin）仍可运行 |
+| 不依赖 cwd | 在无关临时目录用绝对路径直接 `node .../src/cli.mjs version` |
+| npx 本地解析 | `npx --no-install pcause version` 从本地依赖解析，不走网络 |
+| 装完能跑演示 | 安装副本运行 `demo --json`，校验 `ok` 与 hunks |
+| 超长工作区 | `PCAUSE_HOME` 指向 **211 字符**的中文长路径，`init` / `list` 正常 |
+| 能力不缺 | 安装后 `help` 覆盖 11 个核心命令 |
+
+```bash
+npm run install:check            # 15 项，几十秒，自动清理临时目录
+node scripts/install-check.mjs --keep   # 保留临时安装目录便于排查
+```
+
+它和 `pack-check` 的分工：pack-check 证明「包能装上、bin 能跑」；install-check 证明「在**恶劣环境**里也能跑」。这也是对「安装兼容问题发布后再修，返工成本远高于发布前核对」的落实。
 
 ## 5. 命令
 

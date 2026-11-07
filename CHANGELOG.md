@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.28.0] - 2026-11-07
+
+### Added
+
+- 新增 `scripts/install-check.mjs`（`npm run install:check`）：15 项「安装无关性」核对——安装到 203 字符含空格/中文的深目录、落盘安装树合规（必含 11 个文件、禁止 `.pcause/`/`test/`/`.github/`）、零依赖（安装项目只有 pcause、dependencies 为空）、不依赖全局安装（本地 `node_modules/.bin`）、PATH 隔离（仅 node 目录 + 系统目录）、不依赖 cwd、`npx --no-install` 本地解析、安装副本 `demo --json`、`PCAUSE_HOME` 211 字符中文长路径 `init`/`list`、`help` 覆盖 11 个核心命令。
+- 导出可复用纯函数 `checkInstalledTree` / `minimalPath` / `longProjectPath`，并新增 9 项自测（安装树缺失/混入、两平台 PATH 构造、深长路径构造、package.json 暴露 `install:check`、发布包必含脚本、README 记录用法），总自测 319 项。
+- README 新增「4.9 安装无关性核对」；`pack-check` 的发布包必含清单加入新脚本。
+
 ## [0.27.0] - 2026-11-07
 
 ### Added
